@@ -234,3 +234,4 @@ outputs/
 - Use smaller batch sizes for BYOL
 - Consider GPU acceleration (BYOL only, LPL is CPU-friendly)
 
+

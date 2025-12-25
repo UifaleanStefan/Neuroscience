@@ -189,3 +189,4 @@ To modify configuration, edit the scripts directly or add command-line arguments
 - **Li & DiCarlo (2008)**: "Unsupervised Natural Experience Rapidly Alters Invariant Object Representation in Visual Cortex" - Original swap exposure experiment
 - **BYOL**: Bootstrap Your Own Latent (Grill et al., 2020) - Contrastive learning baseline
 
+

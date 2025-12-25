@@ -192,3 +192,4 @@ To create a custom dataset for LPL:
 - CIFAR-10 is downloaded once and reused
 - Temporal pairs should preserve semantic identity (same object/viewpoint with different transformations)
 
+
