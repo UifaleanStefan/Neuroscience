@@ -99,14 +99,15 @@ class LPLLayer:
         # Initialize weight update
         dW = torch.zeros_like(self.W)
         
-        # Apply Hebbian term if enabled
+        # Apply Hebbian term if enabled (use in-place addition to avoid creating new tensors)
         if self.cfg.use_hebb:
             dW_hebb = hebbian(x_t, y_t, self.cfg.lr_hebb)
             if torch.isnan(dW_hebb).any():
                 import warnings
                 warnings.warn("NaN detected in Hebbian update term. Skipping this term.")
             else:
-                dW = dW + dW_hebb
+                dW.add_(dW_hebb)  # In-place addition
+                del dW_hebb  # Explicitly free intermediate tensor
         
         # Apply predictive term if enabled
         if self.cfg.use_pred:
@@ -115,7 +116,8 @@ class LPLLayer:
                 import warnings
                 warnings.warn("NaN detected in predictive update term. Skipping this term.")
             else:
-                dW = dW + dW_pred
+                dW.add_(dW_pred)  # In-place addition
+                del dW_pred  # Explicitly free intermediate tensor
         
         # Apply stabilization term if enabled
         if self.cfg.use_stab:
@@ -124,26 +126,31 @@ class LPLLayer:
                 import warnings
                 warnings.warn("NaN detected in stabilization update term. Skipping this term.")
             else:
-                dW = dW + dW_stab
+                dW.add_(dW_stab)  # In-place addition
+                del dW_stab  # Explicitly free intermediate tensor
         
         # Normalize weight update to prevent large jumps
         # Clip the norm of dW to prevent explosive updates
         max_update_norm = 1.0
         dW_norm = torch.norm(dW)
         if dW_norm > max_update_norm:
-            dW = dW * (max_update_norm / dW_norm)
+            scale = max_update_norm / dW_norm
+            dW = dW * scale
+            del dW_norm, scale  # Free intermediate tensors
         
         # Check for NaN in combined update
         if torch.isnan(dW).any():
             import warnings
             warnings.warn("NaN detected in combined weight update. Skipping update.")
+            del dW  # Free before returning
             return
         
-        # Update weights explicitly
+        # Update weights explicitly (this creates a new tensor, old W stays until overwritten)
         self.W = self.W + dW
+        del dW  # Free dW after it's been used
         
-        # Clip weights to safe range to prevent explosion
-        self.W = torch.clamp(self.W, min=-5.0, max=5.0)
+        # Clip weights to safe range to prevent explosion (in-place to save memory)
+        self.W.clamp_(min=-5.0, max=5.0)
         
         # Final check for NaN in weights
         if torch.isnan(self.W).any():
@@ -152,3 +159,6 @@ class LPLLayer:
         
         # Update predictor after weight update
         self.predictor.update(y_t, y_t1)
+        
+        # Free intermediate activation tensors
+        del y_t, y_t1, y_hat_t1

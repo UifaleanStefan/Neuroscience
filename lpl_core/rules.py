@@ -89,5 +89,7 @@ def stabilization(y_t: torch.Tensor,
         # Scale down when activations are large to prevent explosion
         scale_factor = 5.0 / y_norm
         dW_stab = dW_stab * scale_factor
+        del scale_factor  # Free intermediate tensor
+    del y_norm, y_t_clipped, y_outer, identity_reg  # Free intermediate tensors
     
     return dW_stab

@@ -69,23 +69,29 @@ class Predictor:
         
         prediction_error = y_t1 - y_hat_t1
         delta_P = self.lr * torch.outer(prediction_error, y_t)
+        del prediction_error  # Free intermediate tensor
         
         # Check for NaN in update
         if torch.isnan(delta_P).any():
             import warnings
             warnings.warn("NaN detected in predictor update. Skipping predictor update.")
+            del delta_P, y_hat_t1  # Free before returning
             return
         
         # Normalize update to prevent large jumps
         max_update_norm = 1.0
-        delta_P_norm = torch.norm(delta_P)
+        delta_P_norm = torch.norm(delta_P).item()  # Convert to Python float to avoid GPU tensor
         if delta_P_norm > max_update_norm:
-            delta_P = delta_P * (max_update_norm / delta_P_norm)
+            delta_P.mul_(max_update_norm / delta_P_norm)  # In-place multiplication
         
-        self.P = self.P + delta_P
+        self.P.add_(delta_P)  # In-place addition
+        del delta_P  # Free after update
         
-        # Clip predictor weights to safe range
-        self.P = torch.clamp(self.P, min=-5.0, max=5.0)
+        # Clip predictor weights to safe range (in-place)
+        self.P.clamp_(min=-5.0, max=5.0)
+        
+        # Free y_hat_t1 if not already freed
+        del y_hat_t1
         
         # Final check for NaN
         if torch.isnan(self.P).any():

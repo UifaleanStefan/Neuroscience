@@ -1,0 +1,19 @@
+{
+  "dataset": "synthetic_shapes",
+  "steps": 5000,
+  "architecture": "conv_mlp_hybrid",
+  "activation": "tanh",
+  "rule": "full_lpl",
+  "baseline": "none",
+  "seed": 42,
+  "input_channels": 1,
+  "input_size": 32,
+  "conv_out_channels": 8,
+  "conv_kernel_size": 3,
+  "d_out": 32,
+  "use_pooling": true,
+  "lr_hebb": 0.001,
+  "lr_pred": 0.001,
+  "lr_stab": 0.0005,
+  "device": "cuda"
+}

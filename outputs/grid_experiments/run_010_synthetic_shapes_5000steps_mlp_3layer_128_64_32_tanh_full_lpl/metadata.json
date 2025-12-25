@@ -1,0 +1,16 @@
+{
+  "dataset": "synthetic_shapes",
+  "steps": 5000,
+  "architecture": "mlp_3layer_128_64_32",
+  "activation": "tanh",
+  "rule": "full_lpl",
+  "baseline": "none",
+  "seed": 42,
+  "d_in": 1024,
+  "d_hidden1": 128,
+  "d_hidden2": 64,
+  "d_out": 32,
+  "lr_hebb": 0.001,
+  "lr_pred": 0.001,
+  "lr_stab": 0.0005
+}
