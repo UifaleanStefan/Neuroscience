@@ -538,26 +538,44 @@ def main():
     
     # Save raw results
     results_file = output_dir / "all_results.json"
+    
+    def convert_to_json_serializable(obj):
+        """Recursively convert numpy/torch types to JSON-serializable types."""
+        if isinstance(obj, torch.Tensor):
+            if obj.numel() == 1:
+                return float(obj.item())
+            else:
+                return obj.detach().cpu().numpy().tolist()
+        elif isinstance(obj, np.ndarray):
+            return obj.tolist()
+        elif isinstance(obj, (np.integer, np.floating, np.number)):
+            return float(obj)
+        elif isinstance(obj, dict):
+            return {str(k): convert_to_json_serializable(v) for k, v in obj.items()}
+        elif isinstance(obj, (list, tuple)):
+            return [convert_to_json_serializable(item) for item in obj]
+        elif isinstance(obj, (int, float, str, bool)) or obj is None:
+            return obj
+        else:
+            # Try to convert unknown types
+            try:
+                if hasattr(obj, 'item'):
+                    return float(obj.item())
+                elif hasattr(obj, 'tolist'):
+                    return obj.tolist()
+                else:
+                    return str(obj)
+            except:
+                return str(obj)
+    
     with open(results_file, 'w') as f:
         # Convert to JSON-serializable format
         json_results = []
         for r in all_results:
-            json_r = {k: v for k, v in r.items() if k != 'layers'}
+            json_r = {k: convert_to_json_serializable(v) for k, v in r.items() if k != 'layers'}
             json_r['layers'] = {}
             for layer_key, layer_data in r['layers'].items():
-                # Convert numpy types to Python types
-                json_layer = {}
-                for k, v in layer_data.items():
-                    if isinstance(v, (np.integer, np.floating)):
-                        json_layer[k] = float(v)
-                    elif isinstance(v, np.ndarray):
-                        json_layer[k] = v.tolist()
-                    elif isinstance(v, dict):
-                        json_layer[k] = {str(kk): float(vv) if isinstance(vv, (np.integer, np.floating)) else vv
-                                        for kk, vv in v.items()}
-                    else:
-                        json_layer[k] = v
-                json_r['layers'][layer_key] = json_layer
+                json_r['layers'][layer_key] = convert_to_json_serializable(layer_data)
             json_results.append(json_r)
         
         json.dump(json_results, f, indent=2)
