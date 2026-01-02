@@ -1,22 +1,24 @@
 """
-Grid Experiment #013: LPL Baseline Run (Conv-MLP Hybrid)
+Grid Experiment #013: Synthetic Shapes with Conv-MLP Hybrid (1000 steps)
 
 Configuration:
-- Dataset: Synthetic Shapes
+- Dataset: Synthetic Shapes (32x32 images)
 - Training steps: 1,000
-- Architecture: Conv-MLP Hybrid (Conv1 → Linear LPL)
-- Activation: tanh (on linear layer)
-- Learning rule: Full LPL (on linear layer: Hebbian + Predictive + Stabilization enabled)
-- Baseline: none (LPL only)
+- Architecture: Conv-MLP Hybrid
+  - Conv layer: 16 channels, kernel 3, stride 1, padding 1
+  - Flatten
+  - MLP head: 128 hidden units → 64 output units
+- Activation: tanh (scaled) throughout
+- Learning rule: Full LPL (Hebbian + Predictive + Stabilization) on MLP layers
+- Temporal pairs: Translation + noise transformations
 - Seed: 42
-
-This run tests a Conv-MLP hybrid architecture with a conv layer for feature extraction
-followed by a linear LPL layer trained with Full LPL rules.
 """
 
 import torch
+import torch.nn as nn
 import json
 import sys
+import gc
 from pathlib import Path
 from collections import defaultdict
 
@@ -24,7 +26,7 @@ from collections import defaultdict
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
-from lpl_core.conv_mlp_hybrid import ConvMLPHybrid
+from lpl_core.hierarchical_lpl import HierarchicalLPL
 from data.synthetic_shapes import SyntheticShapesDataset, create_temporal_pair_dataset
 
 
@@ -40,21 +42,170 @@ class LayerConfig:
         self.use_stab = use_stab
 
 
-def export_activations(model, dataset, num_samples=1000, device='cpu'):
+class ConvMLPHybrid2Layer:
     """
-    Export activations for a set of samples.
-    Exports final layer (linear LPL layer) activations.
+    Conv-MLP Hybrid with 2-layer MLP head.
+    
+    Architecture: Conv layer → Flatten → MLP (128 → 64)
+    The convolutional layer extracts spatial features from 2D images.
+    The MLP head processes the flattened conv features using LPL.
+    
+    Design choice: The conv layer acts as a fixed feature extractor (not trained).
+    This tests whether LPL can learn useful representations from random conv features.
+    The conv layer uses torch.no_grad() during forward pass to prevent gradient tracking
+    and save memory, but parameters remain trainable if you want to add backprop later.
+    """
+    
+    def __init__(self, input_channels: int, input_size: int, 
+                 conv_out_channels: int, conv_kernel_size: int,
+                 conv_stride: int, conv_padding: int,
+                 mlp_hidden: int, mlp_out: int,
+                 cfg_layer1, cfg_layer2):
+        """
+        Initialize Conv-MLP Hybrid model with 2-layer MLP.
+        
+        Args:
+            input_channels: Number of input channels (1 for grayscale)
+            input_size: Input image size (32 for 32x32)
+            conv_out_channels: Number of output channels from conv layer
+            conv_kernel_size: Kernel size for conv layer
+            conv_stride: Stride for conv layer
+            conv_padding: Padding for conv layer
+            mlp_hidden: Hidden layer dimension (128)
+            mlp_out: Output dimension (64)
+            cfg_layer1: Configuration for first MLP layer
+            cfg_layer2: Configuration for second MLP layer
+        """
+        self.input_channels = input_channels
+        self.input_size = input_size
+        self.conv_out_channels = conv_out_channels
+        
+        # Create convolutional layer
+        self.conv = nn.Conv2d(
+            in_channels=input_channels,
+            out_channels=conv_out_channels,
+            kernel_size=conv_kernel_size,
+            stride=conv_stride,
+            padding=conv_padding
+        )
+        
+        # Note: Conv layer is not trained with LPL rules (acts as fixed feature extractor)
+        # We use torch.no_grad() during forward pass to prevent gradient tracking
+        # but keep requires_grad=True in case you want to train it with backprop later
+        
+        # Calculate flattened conv output size
+        # With padding=1, kernel=3, stride=1: output size = input_size (32x32)
+        conv_output_size = conv_out_channels * input_size * input_size
+        
+        # Create 2-layer MLP using HierarchicalLPL
+        self.mlp = HierarchicalLPL(
+            d_in=conv_output_size,
+            d_hidden=mlp_hidden,
+            d_out=mlp_out,
+            cfg_layer1=cfg_layer1,
+            cfg_layer2=cfg_layer2
+        )
+        
+        self.d_out = mlp_out
+    
+    def forward(self, x: torch.Tensor, return_conv_features=False):
+        """
+        Forward pass through conv and MLP layers.
+        
+        Args:
+            x: Input tensor of shape (H, W) for grayscale image, or (C, H, W)
+            return_conv_features: If True, also return conv feature maps
+            
+        Returns:
+            Output tensor from MLP of shape (d_out,)
+            If return_conv_features=True, also returns conv feature maps
+        """
+        # Ensure x is 3D: (C, H, W)
+        if x.dim() == 2:
+            x = x.unsqueeze(0)  # Add channel dimension: (1, H, W)
+        elif x.dim() == 1:
+            # If flattened, reshape to 2D then add channel
+            size = int(x.shape[0] ** 0.5)
+            x = x.reshape(1, size, size)
+        
+        # Conv forward
+        conv_out = self.conv(x)  # (C_out, H, W)
+        
+        # Apply tanh activation to conv output (as specified)
+        conv_out = torch.tanh(conv_out)
+        
+        # Flatten conv output
+        conv_flat = conv_out.flatten()  # (C_out * H * W,)
+        
+        # MLP forward (includes tanh activation in LPL layers)
+        y1, y2 = self.mlp.get_activations(conv_flat)
+        
+        if return_conv_features:
+            return y2, conv_out  # Return final output and conv features
+        return y2
+    
+    def update(self, x_t: torch.Tensor, x_t1: torch.Tensor):
+        """
+        Update model using local learning rules.
+        
+        Updates the MLP layers using Full LPL rules.
+        The conv layer acts as feature extraction (not updated with LPL rules).
+        
+        Args:
+            x_t: Input tensor at time t (2D image of shape (H, W) or flattened)
+            x_t1: Input tensor at time t+1 (2D image of shape (H, W) or flattened)
+        """
+        # Process inputs through conv layer to get features
+        # Handle different input formats
+        if x_t.dim() == 1:
+            # Flattened input - reshape to 2D
+            size = int(x_t.shape[0] ** 0.5)
+            x_t = x_t.reshape(size, size)
+            x_t1 = x_t1.reshape(size, size)
+        
+        # Ensure x_t and x_t1 are 3D: (C, H, W)
+        if x_t.dim() == 2:
+            x_t = x_t.unsqueeze(0)  # (1, H, W)
+            x_t1 = x_t1.unsqueeze(0)  # (1, H, W)
+        
+        # Forward through conv (with tanh) - use no_grad to prevent gradient tracking
+        # This saves memory by not building computation graph for conv operations
+        with torch.no_grad():
+            conv_t = torch.tanh(self.conv(x_t))
+            conv_t1 = torch.tanh(self.conv(x_t1))
+            
+            # Flatten conv outputs immediately to reduce memory
+            conv_flat_t = conv_t.flatten().detach()  # detach() ensures no gradient connection
+            conv_flat_t1 = conv_t1.flatten().detach()
+        
+        # Clear intermediate conv tensors to save memory
+        del conv_t, conv_t1
+        
+        # Update MLP layers using local learning rules (Full LPL)
+        self.mlp.update(conv_flat_t, conv_flat_t1)
+        
+        # Clear flattened tensors
+        del conv_flat_t, conv_flat_t1
+        
+        # Explicitly clear any cached intermediate values
+        torch.cuda.empty_cache() if torch.cuda.is_available() else None
+
+
+def export_activations(model, dataset, num_samples=1000):
+    """
+    Export activations from conv features and MLP layers.
     
     Args:
-        model: ConvMLPHybrid model
+        model: ConvMLPHybrid2Layer model
         dataset: SyntheticShapesDataset (can be temporal pair or single image mode)
         num_samples: Number of samples to export
-        device: Device to run on ('cpu' or 'cuda')
         
     Returns:
-        Dictionary with 'activations' and 'labels'
+        Dictionary with 'conv_features', 'mlp_layer1_activations', 'mlp_layer2_activations', and 'labels'
     """
-    activations = []
+    conv_features_list = []
+    mlp_layer1_activations = []
+    mlp_layer2_activations = []
     labels = []
     
     for i in range(min(num_samples, len(dataset))):
@@ -71,61 +222,48 @@ def export_activations(model, dataset, num_samples=1000, device='cpu'):
             image = image.float()
         image = torch.clamp(image, 0.0, 1.0)
         
-        # Move to device
-        image = image.to(device)
+        # Forward pass to get activations
+        # Ensure image is 3D: (C, H, W)
+        image_3d = image.unsqueeze(0) if image.dim() == 2 else image
         
-        # Forward pass to get activations (returns linear layer output)
         with torch.no_grad():
-            y = model.forward(image)
-        
-        # Move back to CPU for storage
-        y = y.cpu()
+            # Get conv features
+            conv_feat = torch.tanh(model.conv(image_3d))
+            conv_flat = conv_feat.flatten()
+            
+            # Get MLP activations
+            y1, y2 = model.mlp.get_activations(conv_flat)
         
         # Check for NaN in activations
-        if torch.isnan(y).any():
-            print(f"WARNING: NaN detected in activation at sample {i}")
+        if torch.isnan(conv_feat).any():
+            print(f"WARNING: NaN detected in conv features at sample {i}")
+            continue
+        if torch.isnan(y1).any():
+            print(f"WARNING: NaN detected in MLP layer1 activation at sample {i}")
+            continue
+        if torch.isnan(y2).any():
+            print(f"WARNING: NaN detected in MLP layer2 activation at sample {i}")
             continue
         
-        activations.append(y)
+        conv_features_list.append(conv_feat)
+        mlp_layer1_activations.append(y1)
+        mlp_layer2_activations.append(y2)
         labels.append(label)
     
     return {
-        'activations': torch.stack(activations),
+        'conv_features': torch.stack(conv_features_list),
+        'mlp_layer1_activations': torch.stack(mlp_layer1_activations),
+        'mlp_layer2_activations': torch.stack(mlp_layer2_activations),
         'labels': torch.tensor(labels)
     }
-
-
-def move_model_to_device(model, device):
-    """Move ConvMLPHybrid model to specified device."""
-    # Move conv layer (nn.Module, use .to())
-    model.conv = model.conv.to(device)
-    if model.pool is not None:
-        model.pool = model.pool.to(device)
-    # Move linear LPL layer weights (tensors, use .to() and reassign)
-    model.linear.W = model.linear.W.to(device)
-    model.linear.predictor.P = model.linear.predictor.P.to(device)
-    # Store device for future operations
-    model.device = device
-    return model
 
 
 def main():
     """
     Run grid experiment #013.
     """
-    # Detect device - will use GPU if CUDA is available, otherwise CPU
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    print(f"Using device: {device}")
-    if device.type == 'cuda':
-        print(f"GPU: {torch.cuda.get_device_name(0)}")
-        print(f"GPU Memory: {torch.cuda.get_device_properties(0).total_memory / 1e9:.2f} GB")
-    else:
-        print("Note: CUDA not available, using CPU. This will be slower but will still work.")
-    
     # Fixed random seed for reproducibility
     torch.manual_seed(42)
-    if device.type == 'cuda':
-        torch.cuda.manual_seed_all(42)
     
     # Experiment configuration
     EXPERIMENT_CONFIG = {
@@ -135,17 +273,20 @@ def main():
         'activation': 'tanh',
         'rule': 'full_lpl',
         'baseline': 'none',
-        'seed': 42,
         'input_channels': 1,        # Grayscale
         'input_size': 32,           # 32x32 images
-        'conv_out_channels': 8,     # Number of conv output channels (reduced for GPU memory)
+        'conv_out_channels': 16,   # Number of conv output channels
         'conv_kernel_size': 3,      # 3x3 conv kernel
-        'd_out': 32,                # Linear LPL layer output dimension (reduced for GPU memory)
-        'use_pooling': True,        # Use max pooling to reduce spatial dimensions
+        'conv_stride': 1,           # Stride 1
+        'conv_padding': 1,          # Padding 1 (for 3x3 kernel on 32x32)
+        'mlp_hidden': 128,          # MLP hidden layer dimension
+        'mlp_out': 64,              # MLP output dimension
         'lr_hebb': 0.001,
         'lr_pred': 0.001,
         'lr_stab': 0.0005,
-        'device': str(device),
+        'seed': 42,
+        'translate_range': 2,
+        'noise_std': 0.05
     }
     
     print("="*70)
@@ -155,13 +296,13 @@ def main():
     print(f"Steps: {EXPERIMENT_CONFIG['steps']}")
     print(f"Architecture: {EXPERIMENT_CONFIG['architecture']}")
     print(f"  Conv: {EXPERIMENT_CONFIG['conv_out_channels']} channels, "
-          f"kernel={EXPERIMENT_CONFIG['conv_kernel_size']}")
-    print(f"  Linear: {EXPERIMENT_CONFIG['d_out']} output dims")
+          f"kernel={EXPERIMENT_CONFIG['conv_kernel_size']}, "
+          f"stride={EXPERIMENT_CONFIG['conv_stride']}, "
+          f"padding={EXPERIMENT_CONFIG['conv_padding']}")
+    print(f"  MLP: {EXPERIMENT_CONFIG['mlp_hidden']} -> {EXPERIMENT_CONFIG['mlp_out']} units")
     print(f"Activation: {EXPERIMENT_CONFIG['activation']}")
     print(f"Rule: {EXPERIMENT_CONFIG['rule']}")
     print(f"Baseline: {EXPERIMENT_CONFIG['baseline']}")
-    print(f"Seed: {EXPERIMENT_CONFIG['seed']}")
-    print(f"Device: {EXPERIMENT_CONFIG.get('device', 'cpu')}")
     print("="*70)
     
     # Create output directory with experiment identifier
@@ -176,7 +317,8 @@ def main():
     print(f"\nMetadata saved to {metadata_file}")
     
     # Create layer configuration (full LPL: all rules enabled)
-    linear_cfg = LayerConfig(
+    # Same configuration for both MLP layers
+    mlp_cfg_layer1 = LayerConfig(
         lr_hebb=EXPERIMENT_CONFIG['lr_hebb'],
         lr_pred=EXPERIMENT_CONFIG['lr_pred'],
         lr_stab=EXPERIMENT_CONFIG['lr_stab'],
@@ -185,19 +327,28 @@ def main():
         use_stab=True    # Full LPL
     )
     
-    # Create model (Conv-MLP Hybrid)
-    model = ConvMLPHybrid(
+    mlp_cfg_layer2 = LayerConfig(
+        lr_hebb=EXPERIMENT_CONFIG['lr_hebb'],
+        lr_pred=EXPERIMENT_CONFIG['lr_pred'],
+        lr_stab=EXPERIMENT_CONFIG['lr_stab'],
+        use_hebb=True,   # Full LPL
+        use_pred=True,   # Full LPL
+        use_stab=True    # Full LPL
+    )
+    
+    # Create model (Conv-MLP Hybrid with 2-layer MLP)
+    model = ConvMLPHybrid2Layer(
         input_channels=EXPERIMENT_CONFIG['input_channels'],
         input_size=EXPERIMENT_CONFIG['input_size'],
         conv_out_channels=EXPERIMENT_CONFIG['conv_out_channels'],
         conv_kernel_size=EXPERIMENT_CONFIG['conv_kernel_size'],
-        d_out=EXPERIMENT_CONFIG['d_out'],
-        cfg_linear=linear_cfg,
-        use_pooling=EXPERIMENT_CONFIG.get('use_pooling', True)
+        conv_stride=EXPERIMENT_CONFIG['conv_stride'],
+        conv_padding=EXPERIMENT_CONFIG['conv_padding'],
+        mlp_hidden=EXPERIMENT_CONFIG['mlp_hidden'],
+        mlp_out=EXPERIMENT_CONFIG['mlp_out'],
+        cfg_layer1=mlp_cfg_layer1,
+        cfg_layer2=mlp_cfg_layer2
     )
-    
-    # Move model to device
-    model = move_model_to_device(model, device)
     
     # Create datasets
     # For activation export: single images (not temporal pairs)
@@ -209,78 +360,189 @@ def main():
     
     # For training: temporal pairs
     train_dataset = create_temporal_pair_dataset(
-        num_samples=10000,  # Large enough to sample from during training
+        num_samples=10000,
         seed=42
     )
     
+    print(f"\nDataset sizes:")
+    print(f"  Export dataset: {len(export_dataset)} samples")
+    print(f"  Training dataset: {len(train_dataset)} samples")
+    
     # Export activations before training
     print("\nExporting activations before training...")
-    activations_before = export_activations(model, export_dataset, num_samples=1000, device=device)
+    activations_before = export_activations(model, export_dataset, num_samples=1000)
     
     # Safety check: no NaN in activations
-    assert not torch.isnan(activations_before['activations']).any(), \
-        "ERROR: NaN detected in activations before training!"
+    assert not torch.isnan(activations_before['conv_features']).any(), \
+        "ERROR: NaN detected in conv features before training!"
+    assert not torch.isnan(activations_before['mlp_layer1_activations']).any(), \
+        "ERROR: NaN detected in MLP layer1 activations before training!"
+    assert not torch.isnan(activations_before['mlp_layer2_activations']).any(), \
+        "ERROR: NaN detected in MLP layer2 activations before training!"
+    
+    # Safety check: activation std > 0.1 (variance check)
+    conv_std_before = activations_before['conv_features'].std().item()
+    mlp1_std_before = activations_before['mlp_layer1_activations'].std().item()
+    mlp2_std_before = activations_before['mlp_layer2_activations'].std().item()
+    print(f"Conv features std before training: {conv_std_before:.6f}")
+    print(f"MLP Layer1 activation std before training: {mlp1_std_before:.6f}")
+    print(f"MLP Layer2 activation std before training: {mlp2_std_before:.6f}")
+    if conv_std_before < 0.1:
+        print(f"WARNING: Conv features std ({conv_std_before:.6f}) is below 0.1 threshold!")
+    if mlp1_std_before < 0.1:
+        print(f"WARNING: MLP Layer1 activation std ({mlp1_std_before:.6f}) is below 0.1 threshold!")
+    if mlp2_std_before < 0.1:
+        print(f"WARNING: MLP Layer2 activation std ({mlp2_std_before:.6f}) is below 0.1 threshold!")
     
     torch.save(activations_before, output_dir / 'activations_before.pt')
     print(f"Saved activations to {output_dir / 'activations_before.pt'}")
     
-    # Initialize training logs
+    # Initialize training logs with per-layer activation statistics
     training_logs = {
         'step': [],
-        'weight_norm': [],
-        'activation_norm': []
+        'weight_norm_mlp_layer1': [],
+        'weight_norm_mlp_layer2': [],
+        'activation_norm_mlp_layer1': [],
+        'activation_norm_mlp_layer2': [],
+        'activation_mean_mlp_layer1': [],
+        'activation_mean_mlp_layer2': [],
+        'activation_std_mlp_layer1': [],  # Activation variance (std)
+        'activation_std_mlp_layer2': []
     }
+    
+    # Log interval to reduce memory usage (log every 10 steps instead of every step)
+    log_interval = 10
     
     # Training loop
     print(f"\nTraining LPL for {EXPERIMENT_CONFIG['steps']} steps...")
     
-    for step in range(1, EXPERIMENT_CONFIG['steps'] + 1):
-        # Sample a temporal pair from the dataset
-        idx = torch.randint(0, len(train_dataset), (1,)).item()
-        x_t, x_t1, _ = train_dataset[idx]
+    try:
+        for step in range(1, EXPERIMENT_CONFIG['steps'] + 1):
+            # Sample a temporal pair from the dataset
+            idx = torch.randint(0, len(train_dataset), (1,)).item()
+            x_t, x_t1, _ = train_dataset[idx]
+            
+            # Ensure inputs are floats in [0,1] range (images are 2D: H, W)
+            if x_t.dtype != torch.float32:
+                x_t = x_t.float()
+            if x_t1.dtype != torch.float32:
+                x_t1 = x_t1.float()
+            x_t = torch.clamp(x_t, 0.0, 1.0)
+            x_t1 = torch.clamp(x_t1, 0.0, 1.0)
+            
+            # Update model using local learning rules (MLP layers update)
+            try:
+                model.update(x_t, x_t1)
+            except Exception as e:
+                print(f"\nERROR: Exception during model.update() at step {step}:")
+                print(f"  {type(e).__name__}: {str(e)}")
+                import traceback
+                traceback.print_exc()
+                raise
+            
+            # Safety check: no NaN in weights (MLP layers) - always check
+            if (torch.isnan(model.mlp.layer1.W).any() or 
+                torch.isnan(model.mlp.layer2.W).any()):
+                print(f"ERROR: NaN detected in weights at step {step}!")
+                assert False, f"NaN detected in weights at step {step}"
+            
+            # Log metrics periodically to reduce memory usage
+            if step % log_interval == 0 or step == 1:
+                weight_norm_mlp_layer1 = torch.norm(model.mlp.layer1.W).item()
+                weight_norm_mlp_layer2 = torch.norm(model.mlp.layer2.W).item()
+                
+                # Get activations for logging
+                x_t_3d = x_t.unsqueeze(0) if x_t.dim() == 2 else x_t
+                with torch.no_grad():
+                    conv_out = torch.tanh(model.conv(x_t_3d))
+                    conv_flat = conv_out.flatten()
+                    y1_sample, y2_sample = model.mlp.get_activations(conv_flat)
+                    
+                    activation_norm_mlp_layer1 = torch.norm(y1_sample).item()
+                    activation_norm_mlp_layer2 = torch.norm(y2_sample).item()
+                    
+                    # Per-layer activation statistics
+                    activation_mean_mlp_layer1 = y1_sample.mean().item()
+                    activation_mean_mlp_layer2 = y2_sample.mean().item()
+                    activation_std_mlp_layer1 = y1_sample.std().item()
+                    activation_std_mlp_layer2 = y2_sample.std().item()
+                    
+                    training_logs['step'].append(step)
+                    training_logs['weight_norm_mlp_layer1'].append(weight_norm_mlp_layer1)
+                    training_logs['weight_norm_mlp_layer2'].append(weight_norm_mlp_layer2)
+                    training_logs['activation_norm_mlp_layer1'].append(activation_norm_mlp_layer1)
+                    training_logs['activation_norm_mlp_layer2'].append(activation_norm_mlp_layer2)
+                    training_logs['activation_mean_mlp_layer1'].append(activation_mean_mlp_layer1)
+                    training_logs['activation_mean_mlp_layer2'].append(activation_mean_mlp_layer2)
+                    training_logs['activation_std_mlp_layer1'].append(activation_std_mlp_layer1)
+                    training_logs['activation_std_mlp_layer2'].append(activation_std_mlp_layer2)
+                    
+                    # Safety check: no NaN in activations (only when logging to save memory)
+                    if (torch.isnan(y1_sample).any() or 
+                        torch.isnan(y2_sample).any()):
+                        print(f"ERROR: NaN detected in activations at step {step}!")
+                        assert False, f"NaN detected in activations at step {step}"
+                    
+                    # Clear intermediate tensors to save memory
+                    del conv_out, conv_flat, y1_sample, y2_sample, x_t_3d
+            
+            # Clear input tensors to save memory
+            del x_t, x_t1
+            
+            # Print progress every 100 steps
+            if step % 100 == 0:
+                # Compute metrics for display
+                weight_norm_mlp_layer1 = torch.norm(model.mlp.layer1.W).item()
+                weight_norm_mlp_layer2 = torch.norm(model.mlp.layer2.W).item()
+            
+                # Sample a random image for activation norm display
+                sample_idx = torch.randint(0, len(train_dataset), (1,)).item()
+                sample_img, _, _ = train_dataset[sample_idx]
+                if sample_img.dtype != torch.float32:
+                    sample_img = sample_img.float()
+                sample_img = torch.clamp(sample_img, 0.0, 1.0)
+                sample_img_3d = sample_img.unsqueeze(0) if sample_img.dim() == 2 else sample_img
+                with torch.no_grad():
+                    conv_temp = torch.tanh(model.conv(sample_img_3d))
+                    conv_flat_temp = conv_temp.flatten()
+                    y1_temp, y2_temp = model.mlp.get_activations(conv_flat_temp)
+                activation_norm_mlp_layer1 = torch.norm(y1_temp).item()
+                activation_norm_mlp_layer2 = torch.norm(y2_temp).item()
+                activation_std_mlp_layer1 = y1_temp.std().item()
+                activation_std_mlp_layer2 = y2_temp.std().item()
+                
+                print(f"Step {step}/{EXPERIMENT_CONFIG['steps']} | "
+                      f"||W1||={weight_norm_mlp_layer1:.4f} | ||W2||={weight_norm_mlp_layer2:.4f} | "
+                      f"||y1||={activation_norm_mlp_layer1:.4f} | ||y2||={activation_norm_mlp_layer2:.4f} | "
+                      f"y1_std={activation_std_mlp_layer1:.4f} | y2_std={activation_std_mlp_layer2:.4f}")
+                
+                # Clear temporary tensors
+                del sample_img, sample_img_3d, conv_temp, conv_flat_temp, y1_temp, y2_temp
+                
+                # Periodic garbage collection to prevent memory buildup
+                gc.collect()
+    
+    except Exception as e:
+        print(f"\nFATAL ERROR: Training crashed at step {step if 'step' in locals() else 'unknown'}")
+        print(f"  Error type: {type(e).__name__}")
+        print(f"  Error message: {str(e)}")
+        import traceback
+        traceback.print_exc()
         
-        # Ensure inputs are floats in [0,1] range (images are already 2D)
-        if x_t.dtype != torch.float32:
-            x_t = x_t.float()
-        if x_t1.dtype != torch.float32:
-            x_t1 = x_t1.float()
-        x_t = torch.clamp(x_t, 0.0, 1.0)
-        x_t1 = torch.clamp(x_t1, 0.0, 1.0)
+        # Try to save partial training logs
+        if 'training_logs' in locals() and len(training_logs['step']) > 0:
+            logs_file = output_dir / 'training_logs_partial.json'
+            with open(logs_file, 'w') as f:
+                json.dump(training_logs, f, indent=2)
+            print(f"\nSaved partial training logs to {logs_file}")
         
-        # Move to device
-        x_t = x_t.to(device)
-        x_t1 = x_t1.to(device)
-        
-        # Update model using local learning rules (only linear layer updates)
-        model.update(x_t, x_t1)
-        
-        # Log metrics every step
-        # Use linear layer weight norm for consistency
-        weight_norm = torch.norm(model.linear.W).item()
-        y_sample = model.forward(x_t)  # Returns linear layer output
-        activation_norm = torch.norm(y_sample).item()
-        
-        # Clear intermediate tensors to save memory (after logging)
-        del x_t, x_t1, y_sample
-        
-        training_logs['step'].append(step)
-        training_logs['weight_norm'].append(weight_norm)
-        training_logs['activation_norm'].append(activation_norm)
-        
-        # Safety check: no NaN in weights (check linear layer)
-        if torch.isnan(model.linear.W).any():
-            print(f"ERROR: NaN detected in weights at step {step}!")
-            assert False, f"NaN detected in weights at step {step}"
-        
-        # Print progress every 100 steps
-        if step % 100 == 0:
-            print(f"Step {step}/{EXPERIMENT_CONFIG['steps']} | "
-                  f"||W||={weight_norm:.4f} | ||y||={activation_norm:.4f}")
+        raise
     
     print("Training completed.")
     
-    # Final safety check: no NaN in weights
-    assert not torch.isnan(model.linear.W).any(), \
+    # Final safety check: no NaN in weights (MLP layers)
+    assert (not torch.isnan(model.mlp.layer1.W).any() and 
+            not torch.isnan(model.mlp.layer2.W).any()), \
         "ERROR: Weights contain NaN values after training!"
     
     # Save training logs
@@ -291,87 +553,109 @@ def main():
     
     # Export activations after training
     print("\nExporting activations after training...")
-    activations_after = export_activations(model, export_dataset, num_samples=1000, device=device)
+    activations_after = export_activations(model, export_dataset, num_samples=1000)
     
     # Safety check: no NaN in activations
-    assert not torch.isnan(activations_after['activations']).any(), \
-        "ERROR: NaN detected in activations after training!"
+    assert not torch.isnan(activations_after['conv_features']).any(), \
+        "ERROR: NaN detected in conv features after training!"
+    assert not torch.isnan(activations_after['mlp_layer1_activations']).any(), \
+        "ERROR: NaN detected in MLP layer1 activations after training!"
+    assert not torch.isnan(activations_after['mlp_layer2_activations']).any(), \
+        "ERROR: NaN detected in MLP layer2 activations after training!"
+    
+    # Safety check: activation std > 0.1 (variance check, non-collapsed)
+    conv_std_after = activations_after['conv_features'].std().item()
+    mlp1_std_after = activations_after['mlp_layer1_activations'].std().item()
+    mlp2_std_after = activations_after['mlp_layer2_activations'].std().item()
+    print(f"\nConv features std after training: {conv_std_after:.6f}")
+    print(f"MLP Layer1 activation std after training: {mlp1_std_after:.6f}")
+    print(f"MLP Layer2 activation std after training: {mlp2_std_after:.6f}")
+    
+    # Explicit collapse reporting
+    conv_collapsed = conv_std_after < 0.1
+    mlp1_collapsed = mlp1_std_after < 0.1
+    mlp2_collapsed = mlp2_std_after < 0.1
+    
+    if conv_collapsed:
+        print(f"*** CONV FEATURES COLLAPSED: Std ({conv_std_after:.6f}) is below 0.1 threshold! ***")
+    else:
+        print(f"OK: Conv features std ({conv_std_after:.6f}) is above 0.1 threshold - healthy")
+    
+    if mlp1_collapsed:
+        print(f"*** MLP LAYER 1 COLLAPSED: Activation std ({mlp1_std_after:.6f}) is below 0.1 threshold - REPRESENTATION COLLAPSED! ***")
+    else:
+        print(f"OK: MLP Layer1 activation std ({mlp1_std_after:.6f}) is above 0.1 threshold - representation is healthy")
+    
+    if mlp2_collapsed:
+        print(f"*** MLP LAYER 2 COLLAPSED: Activation std ({mlp2_std_after:.6f}) is below 0.1 threshold - REPRESENTATION COLLAPSED! ***")
+    else:
+        print(f"OK: MLP Layer2 activation std ({mlp2_std_after:.6f}) is above 0.1 threshold - representation is healthy")
     
     torch.save(activations_after, output_dir / 'activations_after.pt')
     print(f"Saved activations to {output_dir / 'activations_after.pt'}")
-    
-    # Comprehensive safety verification
-    print("\n" + "="*70)
-    print("SAFETY & VERIFICATION".center(70))
-    print("="*70)
-    
-    # Check for NaN in weights
-    weights_has_nan = torch.isnan(model.linear.W).any().item()
-    weights_check = 'PASS' if not weights_has_nan else 'FAIL'
-    print(f"Weights NaN check (Linear layer): {weights_check}")
-    if weights_has_nan:
-        print("  ⚠️  WARNING: NaN values detected in weights!")
-    
-    # Check for NaN in activations_before
-    act_before_has_nan = torch.isnan(activations_before['activations']).any().item()
-    act_before_check = 'PASS' if not act_before_has_nan else 'FAIL'
-    print(f"Activations before NaN check: {act_before_check}")
-    if act_before_has_nan:
-        print("  ⚠️  WARNING: NaN values detected in activations_before!")
-    
-    # Check for NaN in activations_after
-    act_after_has_nan = torch.isnan(activations_after['activations']).any().item()
-    act_after_check = 'PASS' if not act_after_has_nan else 'FAIL'
-    print(f"Activations after NaN check: {act_after_check}")
-    if act_after_has_nan:
-        print("  ⚠️  WARNING: NaN values detected in activations_after!")
-    
-    # Check activation std > 0.1 (non-collapsed)
-    activations_final = activations_after['activations']
-    activation_std = activations_final.std().item()
-    activation_mean = activations_final.mean().item()
-    activation_min = activations_final.min().item()
-    activation_max = activations_final.max().item()
-    non_collapsed = activation_std > 0.1
-    collapse_check = 'PASS' if non_collapsed else 'FAIL'
-    print(f"Activation std > 0.1 (non-collapsed): {collapse_check} (std={activation_std:.6f})")
-    if not non_collapsed:
-        print("  ⚠️  WARNING: Activation std <= 0.1 - representation may be collapsed!")
     
     # Print final statistics
     print("\n" + "="*70)
     print("FINAL STATISTICS".center(70))
     print("="*70)
-    print(f"Activation mean: {activation_mean:.6f}")
-    print(f"Activation std:  {activation_std:.6f}")
-    print(f"Activation min:  {activation_min:.6f}")
-    print(f"Activation max:  {activation_max:.6f}")
-    final_weight_norm = torch.norm(model.linear.W).item()
-    print(f"Weight norm (Linear): {final_weight_norm:.6f}")
+    conv_final = activations_after['conv_features']
+    mlp1_final = activations_after['mlp_layer1_activations']
+    mlp2_final = activations_after['mlp_layer2_activations']
+    
+    print("Conv Features:")
+    print(f"  Activation mean: {conv_final.mean().item():.6f}")
+    print(f"  Activation std:  {conv_final.std().item():.6f}")
+    print(f"  Activation min:  {conv_final.min().item():.6f}")
+    print(f"  Activation max:  {conv_final.max().item():.6f}")
+    print(f"  Shape:           {conv_final.shape}")
+    print(f"  Std > 0.1:       {conv_std_after > 0.1}")
+    
+    print("\nMLP Layer 1 (128 units):")
+    print(f"  Activation mean: {mlp1_final.mean().item():.6f}")
+    print(f"  Activation std:  {mlp1_final.std().item():.6f}")
+    print(f"  Activation min:  {mlp1_final.min().item():.6f}")
+    print(f"  Activation max:  {mlp1_final.max().item():.6f}")
+    print(f"  Weight norm:     {torch.norm(model.mlp.layer1.W).item():.6f}")
+    print(f"  No NaN:          {not torch.isnan(mlp1_final).any().item()}")
+    print(f"  Std > 0.1:       {mlp1_std_after > 0.1}")
+    
+    print("\nMLP Layer 2 (64 units):")
+    print(f"  Activation mean: {mlp2_final.mean().item():.6f}")
+    print(f"  Activation std:  {mlp2_final.std().item():.6f}")
+    print(f"  Activation min:  {mlp2_final.min().item():.6f}")
+    print(f"  Activation max:  {mlp2_final.max().item():.6f}")
+    print(f"  Weight norm:     {torch.norm(model.mlp.layer2.W).item():.6f}")
+    print(f"  No NaN:          {not torch.isnan(mlp2_final).any().item()}")
+    print(f"  Std > 0.1:       {mlp2_std_after > 0.1}")
     print("="*70)
     
-    # Final summary output
-    print("\n" + "="*70)
-    print("EXPERIMENT SUMMARY".center(70))
-    print("="*70)
-    print(f"Dataset:          {EXPERIMENT_CONFIG['dataset']}")
-    print(f"Steps:            {EXPERIMENT_CONFIG['steps']}")
-    print(f"Architecture:     {EXPERIMENT_CONFIG['architecture']}")
-    print(f"Activation std:   {activation_std:.6f}")
-    print(f"Weight norm:      {final_weight_norm:.6f}")
-    all_checks_pass = not weights_has_nan and not act_before_has_nan and not act_after_has_nan and non_collapsed
-    summary_check = 'PASS' if all_checks_pass else 'FAIL'
-    print(f"NaN check:        {summary_check}")
-    if not all_checks_pass:
-        print("\n  ⚠️  WARNING: One or more safety checks failed!")
-        print(f"     - Weights NaN: {weights_check}")
-        print(f"     - Activations before NaN: {act_before_check}")
-        print(f"     - Activations after NaN: {act_after_check}")
-        print(f"     - Non-collapsed (std > 0.1): {collapse_check}")
-    print("="*70)
+    # Verify all files were created
+    print("\nVerifying exported files...")
+    required_files = [
+        'metadata.json',
+        'training_logs.json',
+        'activations_before.pt',
+        'activations_after.pt'
+    ]
+    
+    all_files_exist = True
+    for filename in required_files:
+        filepath = output_dir / filename
+        if filepath.exists():
+            file_size = filepath.stat().st_size
+            print(f"  OK: {filename} ({file_size:,} bytes)")
+        else:
+            print(f"  ERROR: {filename} not found!")
+            all_files_exist = False
+    
+    if not all_files_exist:
+        assert False, "Not all required files were exported!"
     
     print(f"\nExperiment completed successfully!")
     print(f"All outputs saved to: {output_dir}")
+    print(f"\nGenerated files:")
+    for filename in required_files:
+        print(f"  - {output_dir / filename}")
 
 
 if __name__ == "__main__":

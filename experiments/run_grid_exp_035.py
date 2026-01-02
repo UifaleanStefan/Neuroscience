@@ -1,9 +1,9 @@
 """
-Grid Experiment #033: MNIST with Conv-MLP Hybrid (50k steps, long training)
+Grid Experiment #035: MNIST with Conv-MLP Hybrid (20k steps)
 
 Configuration:
 - Dataset: MNIST (grayscale, 28x28 images)
-- Training steps: 50,000
+- Training steps: 20,000
 - Architecture: Conv-MLP Hybrid
   - Conv layer: 16 channels, kernel 5, stride 1, padding 2
   - Flatten
@@ -12,13 +12,7 @@ Configuration:
 - Learning rule: Full LPL (Hebbian + Predictive + Stabilization) on MLP layers
 - Temporal pairs: Translation + noise transformations
 - Seed: 42
-
-Features:
-- Close stability monitoring during long training
-- Logs: activation variance, weight norms, update magnitudes
-- Aborts training if representations collapse
-- Full diagnostics after training
-- Reports which layer collapses first (if any)
+- Intermediate exports at: initialization, 10k steps (midpoint), final step
 """
 
 import torch
@@ -267,18 +261,15 @@ def export_activations(model, dataset, num_samples=1000):
 
 def main():
     """
-    Run grid experiment #033.
+    Run grid experiment #035.
     """
     # Fixed random seed for reproducibility
     torch.manual_seed(42)
     
-    # Collapse detection threshold
-    COLLAPSE_THRESHOLD = 0.1  # Activation std below this indicates collapse
-    
     # Experiment configuration
     EXPERIMENT_CONFIG = {
         'dataset': 'mnist',
-        'steps': 50000,
+        'steps': 20000,
         'architecture': 'conv_mlp_hybrid',
         'activation': 'tanh',
         'rule': 'full_lpl',
@@ -296,12 +287,11 @@ def main():
         'lr_stab': 0.0005,
         'seed': 42,
         'translate_range': 2,
-        'noise_std': 0.05,
-        'collapse_threshold': COLLAPSE_THRESHOLD
+        'noise_std': 0.05
     }
     
     print("="*70)
-    print("GRID EXPERIMENT #033".center(70))
+    print("GRID EXPERIMENT #035".center(70))
     print("="*70)
     print(f"Dataset: {EXPERIMENT_CONFIG['dataset']}")
     print(f"Steps: {EXPERIMENT_CONFIG['steps']}")
@@ -314,12 +304,11 @@ def main():
     print(f"Activation: {EXPERIMENT_CONFIG['activation']}")
     print(f"Rule: {EXPERIMENT_CONFIG['rule']}")
     print(f"Baseline: {EXPERIMENT_CONFIG['baseline']}")
-    print(f"Collapse threshold: {COLLAPSE_THRESHOLD}")
     print("="*70)
     
     # Create output directory with experiment identifier
     output_base = Path('outputs/grid_experiments')
-    output_dir = output_base / "run_033_mnist_50000steps_conv_mlp_tanh_full_lpl"
+    output_dir = output_base / "run_035_mnist_20000steps_conv_mlp_tanh_full_lpl"
     output_dir.mkdir(parents=True, exist_ok=True)
     
     # Save metadata
@@ -403,54 +392,35 @@ def main():
     print(f"Conv features std before training: {conv_std_before:.6f}")
     print(f"MLP Layer1 activation std before training: {mlp1_std_before:.6f}")
     print(f"MLP Layer2 activation std before training: {mlp2_std_before:.6f}")
-    if conv_std_before < COLLAPSE_THRESHOLD:
-        print(f"WARNING: Conv features std ({conv_std_before:.6f}) is below {COLLAPSE_THRESHOLD} threshold!")
-    if mlp1_std_before < COLLAPSE_THRESHOLD:
-        print(f"WARNING: MLP Layer1 activation std ({mlp1_std_before:.6f}) is below {COLLAPSE_THRESHOLD} threshold!")
-    if mlp2_std_before < COLLAPSE_THRESHOLD:
-        print(f"WARNING: MLP Layer2 activation std ({mlp2_std_before:.6f}) is below {COLLAPSE_THRESHOLD} threshold!")
+    if conv_std_before < 0.1:
+        print(f"WARNING: Conv features std ({conv_std_before:.6f}) is below 0.1 threshold!")
+    if mlp1_std_before < 0.1:
+        print(f"WARNING: MLP Layer1 activation std ({mlp1_std_before:.6f}) is below 0.1 threshold!")
+    if mlp2_std_before < 0.1:
+        print(f"WARNING: MLP Layer2 activation std ({mlp2_std_before:.6f}) is below 0.1 threshold!")
     
     torch.save(activations_before, output_dir / 'activations_before.pt')
     print(f"Saved activations to {output_dir / 'activations_before.pt'}")
     
-    # Initialize training logs with comprehensive monitoring
+    # Initialize training logs with per-layer activation statistics and weight norms
     training_logs = {
         'step': [],
-        'weight_norm_conv': [],  # Conv layer weight norm
+        'weight_norm_conv': [],  # Conv layer weight norm (for tracking, even though not trained)
         'weight_norm_mlp_layer1': [],
         'weight_norm_mlp_layer2': [],
-        'update_magnitude_mlp_layer1': [],  # Update magnitude (weight change)
-        'update_magnitude_mlp_layer2': [],
         'activation_norm_mlp_layer1': [],
         'activation_norm_mlp_layer2': [],
         'activation_mean_mlp_layer1': [],
         'activation_mean_mlp_layer2': [],
         'activation_std_mlp_layer1': [],  # Activation variance (std)
-        'activation_std_mlp_layer2': [],
-        'conv_features_std': []  # Conv features std (from sample)
+        'activation_std_mlp_layer2': []
     }
     
-    # Store previous weights for update magnitude calculation
-    prev_mlp1_W = model.mlp.layer1.W.clone()
-    prev_mlp2_W = model.mlp.layer2.W.clone()
-    
-    # Log interval to reduce memory usage (log every 10 steps)
+    # Log interval to reduce memory usage (log every 10 steps instead of every step)
     log_interval = 10
-    # Collapse check interval (check more frequently for long training)
-    collapse_check_interval = 100
-    
-    # Track collapse information
-    collapse_info = {
-        'conv_collapsed': False,
-        'mlp1_collapsed': False,
-        'mlp2_collapsed': False,
-        'first_collapse_step': None,
-        'first_collapse_layer': None
-    }
     
     # Training loop
     print(f"\nTraining LPL for {EXPERIMENT_CONFIG['steps']} steps...")
-    print("Monitoring stability closely - will abort if representations collapse.")
     
     try:
         for step in range(1, EXPERIMENT_CONFIG['steps'] + 1):
@@ -489,14 +459,6 @@ def main():
                 weight_norm_mlp_layer1 = torch.norm(model.mlp.layer1.W).item()
                 weight_norm_mlp_layer2 = torch.norm(model.mlp.layer2.W).item()
                 
-                # Compute update magnitudes (weight change)
-                update_magnitude_mlp1 = torch.norm(model.mlp.layer1.W - prev_mlp1_W).item()
-                update_magnitude_mlp2 = torch.norm(model.mlp.layer2.W - prev_mlp2_W).item()
-                
-                # Update previous weights for next iteration
-                prev_mlp1_W = model.mlp.layer1.W.clone()
-                prev_mlp2_W = model.mlp.layer2.W.clone()
-                
                 # Get activations for logging
                 x_t_3d = x_t.unsqueeze(0) if x_t.dim() == 2 else x_t
                 with torch.no_grad():
@@ -512,21 +474,17 @@ def main():
                     activation_mean_mlp_layer2 = y2_sample.mean().item()
                     activation_std_mlp_layer1 = y1_sample.std().item()
                     activation_std_mlp_layer2 = y2_sample.std().item()
-                    conv_features_std = conv_out.std().item()
                     
                     training_logs['step'].append(step)
                     training_logs['weight_norm_conv'].append(weight_norm_conv)
                     training_logs['weight_norm_mlp_layer1'].append(weight_norm_mlp_layer1)
                     training_logs['weight_norm_mlp_layer2'].append(weight_norm_mlp_layer2)
-                    training_logs['update_magnitude_mlp_layer1'].append(update_magnitude_mlp1)
-                    training_logs['update_magnitude_mlp_layer2'].append(update_magnitude_mlp2)
                     training_logs['activation_norm_mlp_layer1'].append(activation_norm_mlp_layer1)
                     training_logs['activation_norm_mlp_layer2'].append(activation_norm_mlp_layer2)
                     training_logs['activation_mean_mlp_layer1'].append(activation_mean_mlp_layer1)
                     training_logs['activation_mean_mlp_layer2'].append(activation_mean_mlp_layer2)
                     training_logs['activation_std_mlp_layer1'].append(activation_std_mlp_layer1)
                     training_logs['activation_std_mlp_layer2'].append(activation_std_mlp_layer2)
-                    training_logs['conv_features_std'].append(conv_features_std)
                     
                     # Safety check: no NaN in activations (only when logging to save memory)
                     if (torch.isnan(y1_sample).any() or 
@@ -540,61 +498,32 @@ def main():
             # Clear input tensors to save memory
             del x_t, x_t1
             
-            # Check for collapse periodically
-            if step % collapse_check_interval == 0:
-                # Sample a batch to check for collapse
-                sample_idx = torch.randint(0, len(train_dataset), (1,)).item()
-                sample_img, _, _ = train_dataset[sample_idx]
-                if sample_img.dtype != torch.float32:
-                    sample_img = sample_img.float()
-                sample_img = torch.clamp(sample_img, 0.0, 1.0)
-                sample_img_3d = sample_img.unsqueeze(0) if sample_img.dim() == 2 else sample_img
+            # Export intermediate activations at 10k steps (midpoint)
+            if step == 10000:
+                print(f"\nExporting activations at {step} steps (midpoint checkpoint)...")
+                activations_midpoint = export_activations(model, export_dataset, num_samples=1000)
                 
-                with torch.no_grad():
-                    conv_temp = torch.tanh(model.conv(sample_img_3d))
-                    conv_flat_temp = conv_temp.flatten()
-                    y1_temp, y2_temp = model.mlp.get_activations(conv_flat_temp)
+                # Safety check: no NaN in activations
+                assert not torch.isnan(activations_midpoint['conv_features']).any(), \
+                    f"ERROR: NaN detected in conv features at step {step}!"
+                assert not torch.isnan(activations_midpoint['mlp_layer1_activations']).any(), \
+                    f"ERROR: NaN detected in MLP layer1 activations at step {step}!"
+                assert not torch.isnan(activations_midpoint['mlp_layer2_activations']).any(), \
+                    f"ERROR: NaN detected in MLP layer2 activations at step {step}!"
                 
-                conv_std_check = conv_temp.std().item()
-                mlp1_std_check = y1_temp.std().item()
-                mlp2_std_check = y2_temp.std().item()
+                # Safety check: activation std > 0.1 (variance check)
+                conv_std_mid = activations_midpoint['conv_features'].std().item()
+                mlp1_std_mid = activations_midpoint['mlp_layer1_activations'].std().item()
+                mlp2_std_mid = activations_midpoint['mlp_layer2_activations'].std().item()
+                print(f"Conv features std at {step} steps: {conv_std_mid:.6f}")
+                print(f"MLP Layer1 activation std at {step} steps: {mlp1_std_mid:.6f}")
+                print(f"MLP Layer2 activation std at {step} steps: {mlp2_std_mid:.6f}")
                 
-                # Check for collapse
-                conv_collapsed = conv_std_check < COLLAPSE_THRESHOLD
-                mlp1_collapsed = mlp1_std_check < COLLAPSE_THRESHOLD
-                mlp2_collapsed = mlp2_std_check < COLLAPSE_THRESHOLD
-                
-                # Track first collapse
-                if not collapse_info['first_collapse_step']:
-                    if conv_collapsed:
-                        collapse_info['conv_collapsed'] = True
-                        collapse_info['first_collapse_step'] = step
-                        collapse_info['first_collapse_layer'] = 'conv'
-                        print(f"\n*** COLLAPSE DETECTED at step {step} ***")
-                        print(f"  Conv layer collapsed first! Std: {conv_std_check:.6f} < {COLLAPSE_THRESHOLD}")
-                        print("  Aborting training to prevent further degradation...")
-                        break
-                    elif mlp1_collapsed:
-                        collapse_info['mlp1_collapsed'] = True
-                        collapse_info['first_collapse_step'] = step
-                        collapse_info['first_collapse_layer'] = 'mlp_layer1'
-                        print(f"\n*** COLLAPSE DETECTED at step {step} ***")
-                        print(f"  MLP Layer 1 collapsed first! Std: {mlp1_std_check:.6f} < {COLLAPSE_THRESHOLD}")
-                        print("  Aborting training to prevent further degradation...")
-                        break
-                    elif mlp2_collapsed:
-                        collapse_info['mlp2_collapsed'] = True
-                        collapse_info['first_collapse_step'] = step
-                        collapse_info['first_collapse_layer'] = 'mlp_layer2'
-                        print(f"\n*** COLLAPSE DETECTED at step {step} ***")
-                        print(f"  MLP Layer 2 collapsed first! Std: {mlp2_std_check:.6f} < {COLLAPSE_THRESHOLD}")
-                        print("  Aborting training to prevent further degradation...")
-                        break
-                
-                del sample_img, sample_img_3d, conv_temp, conv_flat_temp, y1_temp, y2_temp
+                torch.save(activations_midpoint, output_dir / 'activations_10000steps.pt')
+                print(f"Saved activations to {output_dir / 'activations_10000steps.pt'}")
             
-            # Print progress every 500 steps (less frequent for long training)
-            if step % 500 == 0:
+            # Print progress every 100 steps
+            if step % 100 == 0:
                 # Compute metrics for display
                 weight_norm_conv = torch.norm(model.conv.weight).item()
                 weight_norm_mlp_layer1 = torch.norm(model.mlp.layer1.W).item()
@@ -615,13 +544,12 @@ def main():
                 activation_norm_mlp_layer2 = torch.norm(y2_temp).item()
                 activation_std_mlp_layer1 = y1_temp.std().item()
                 activation_std_mlp_layer2 = y2_temp.std().item()
-                conv_std_display = conv_temp.std().item()
                 
                 print(f"Step {step}/{EXPERIMENT_CONFIG['steps']} | "
                       f"||W_conv||={weight_norm_conv:.4f} | "
                       f"||W1||={weight_norm_mlp_layer1:.4f} | ||W2||={weight_norm_mlp_layer2:.4f} | "
                       f"||y1||={activation_norm_mlp_layer1:.4f} | ||y2||={activation_norm_mlp_layer2:.4f} | "
-                      f"conv_std={conv_std_display:.4f} | y1_std={activation_std_mlp_layer1:.4f} | y2_std={activation_std_mlp_layer2:.4f}")
+                      f"y1_std={activation_std_mlp_layer1:.4f} | y2_std={activation_std_mlp_layer2:.4f}")
                 
                 # Clear temporary tensors
                 del sample_img, sample_img_3d, conv_temp, conv_flat_temp, y1_temp, y2_temp
@@ -645,12 +573,7 @@ def main():
         
         raise
     
-    # Check if training was aborted due to collapse
-    if collapse_info['first_collapse_step']:
-        print(f"\nTraining aborted at step {collapse_info['first_collapse_step']} due to representation collapse.")
-        print(f"First layer to collapse: {collapse_info['first_collapse_layer']}")
-    else:
-        print("Training completed without collapse.")
+    print("Training completed.")
     
     # Final safety check: no NaN in weights (MLP layers)
     assert (not torch.isnan(model.mlp.layer1.W).any() and 
@@ -662,12 +585,6 @@ def main():
     with open(logs_file, 'w') as f:
         json.dump(training_logs, f, indent=2)
     print(f"\nSaved training logs to {logs_file}")
-    
-    # Save collapse information
-    collapse_file = output_dir / 'collapse_info.json'
-    with open(collapse_file, 'w') as f:
-        json.dump(collapse_info, f, indent=2)
-    print(f"Saved collapse information to {collapse_file}")
     
     # Export activations after training (final step)
     print("\nExporting activations after training (final step)...")
@@ -681,73 +598,40 @@ def main():
     assert not torch.isnan(activations_after['mlp_layer2_activations']).any(), \
         "ERROR: NaN detected in MLP layer2 activations after training!"
     
-    # Full diagnostics after training
-    print("\n" + "="*70)
-    print("FULL DIAGNOSTICS".center(70))
-    print("="*70)
-    
     # Safety check: activation std > 0.1 (variance check, non-collapsed)
     conv_std_after = activations_after['conv_features'].std().item()
     mlp1_std_after = activations_after['mlp_layer1_activations'].std().item()
     mlp2_std_after = activations_after['mlp_layer2_activations'].std().item()
-    
-    print(f"\nActivation Variance (std) Analysis:")
-    print(f"  Conv features std:     {conv_std_after:.6f} (threshold: {COLLAPSE_THRESHOLD})")
-    print(f"  MLP Layer1 std:        {mlp1_std_after:.6f} (threshold: {COLLAPSE_THRESHOLD})")
-    print(f"  MLP Layer2 std:        {mlp2_std_after:.6f} (threshold: {COLLAPSE_THRESHOLD})")
+    print(f"\nConv features std after training: {conv_std_after:.6f}")
+    print(f"MLP Layer1 activation std after training: {mlp1_std_after:.6f}")
+    print(f"MLP Layer2 activation std after training: {mlp2_std_after:.6f}")
     
     # Explicit collapse reporting
-    conv_collapsed = conv_std_after < COLLAPSE_THRESHOLD
-    mlp1_collapsed = mlp1_std_after < COLLAPSE_THRESHOLD
-    mlp2_collapsed = mlp2_std_after < COLLAPSE_THRESHOLD
+    conv_collapsed = conv_std_after < 0.1
+    mlp1_collapsed = mlp1_std_after < 0.1
+    mlp2_collapsed = mlp2_std_after < 0.1
     
-    print(f"\nCollapse Status:")
     if conv_collapsed:
-        print(f"  *** CONV FEATURES COLLAPSED: Std ({conv_std_after:.6f}) is below {COLLAPSE_THRESHOLD} threshold! ***")
-        collapse_info['conv_collapsed'] = True
+        print(f"*** CONV FEATURES COLLAPSED: Std ({conv_std_after:.6f}) is below 0.1 threshold! ***")
     else:
-        print(f"  OK: Conv features std ({conv_std_after:.6f}) is above {COLLAPSE_THRESHOLD} threshold - healthy")
+        print(f"OK: Conv features std ({conv_std_after:.6f}) is above 0.1 threshold - healthy")
     
     if mlp1_collapsed:
-        print(f"  *** MLP LAYER 1 COLLAPSED: Activation std ({mlp1_std_after:.6f}) is below {COLLAPSE_THRESHOLD} threshold - REPRESENTATION COLLAPSED! ***")
-        collapse_info['mlp1_collapsed'] = True
+        print(f"*** MLP LAYER 1 COLLAPSED: Activation std ({mlp1_std_after:.6f}) is below 0.1 threshold - REPRESENTATION COLLAPSED! ***")
     else:
-        print(f"  OK: MLP Layer1 activation std ({mlp1_std_after:.6f}) is above {COLLAPSE_THRESHOLD} threshold - representation is healthy")
+        print(f"OK: MLP Layer1 activation std ({mlp1_std_after:.6f}) is above 0.1 threshold - representation is healthy")
     
     if mlp2_collapsed:
-        print(f"  *** MLP LAYER 2 COLLAPSED: Activation std ({mlp2_std_after:.6f}) is below {COLLAPSE_THRESHOLD} threshold - REPRESENTATION COLLAPSED! ***")
-        collapse_info['mlp2_collapsed'] = True
+        print(f"*** MLP LAYER 2 COLLAPSED: Activation std ({mlp2_std_after:.6f}) is below 0.1 threshold - REPRESENTATION COLLAPSED! ***")
     else:
-        print(f"  OK: MLP Layer2 activation std ({mlp2_std_after:.6f}) is above {COLLAPSE_THRESHOLD} threshold - representation is healthy")
-    
-    # Determine which layer collapsed first (if any)
-    if collapse_info['first_collapse_step']:
-        print(f"\n*** COLLAPSE DETECTION SUMMARY ***")
-        print(f"  First collapse detected at step: {collapse_info['first_collapse_step']}")
-        print(f"  First layer to collapse: {collapse_info['first_collapse_layer']}")
-    elif conv_collapsed or mlp1_collapsed or mlp2_collapsed:
-        # Collapse detected at final check but not during training
-        collapsed_layers = []
-        if conv_collapsed:
-            collapsed_layers.append('conv')
-        if mlp1_collapsed:
-            collapsed_layers.append('mlp_layer1')
-        if mlp2_collapsed:
-            collapsed_layers.append('mlp_layer2')
-        print(f"\n*** COLLAPSE DETECTED AT FINAL CHECK ***")
-        print(f"  Collapsed layers: {', '.join(collapsed_layers)}")
-        if collapsed_layers:
-            collapse_info['first_collapse_layer'] = collapsed_layers[0]
-    else:
-        print(f"\n*** NO COLLAPSE DETECTED ***")
-        print(f"  All layers maintained healthy representations throughout training.")
+        print(f"OK: MLP Layer2 activation std ({mlp2_std_after:.6f}) is above 0.1 threshold - representation is healthy")
     
     torch.save(activations_after, output_dir / 'activations_after.pt')
-    print(f"\nSaved activations to {output_dir / 'activations_after.pt'}")
+    print(f"Saved activations to {output_dir / 'activations_after.pt'}")
     
-    # Print comprehensive final statistics
+    # Print final statistics
     print("\n" + "="*70)
-    print("COMPREHENSIVE FINAL STATISTICS".center(70))
+    print("FINAL STATISTICS".center(70))
     print("="*70)
     conv_final = activations_after['conv_features']
     mlp1_final = activations_after['mlp_layer1_activations']
@@ -758,14 +642,14 @@ def main():
     weight_norm_mlp1_final = torch.norm(model.mlp.layer1.W).item()
     weight_norm_mlp2_final = torch.norm(model.mlp.layer2.W).item()
     
-    print("\nConv Layer:")
+    print("Conv Layer:")
     print(f"  Weight norm:     {weight_norm_conv_final:.6f}")
     print(f"  Activation mean: {conv_final.mean().item():.6f}")
     print(f"  Activation std:  {conv_final.std().item():.6f}")
     print(f"  Activation min:  {conv_final.min().item():.6f}")
     print(f"  Activation max:  {conv_final.max().item():.6f}")
     print(f"  Shape:           {conv_final.shape}")
-    print(f"  Std > {COLLAPSE_THRESHOLD}:       {conv_std_after > COLLAPSE_THRESHOLD}")
+    print(f"  Std > 0.1:       {conv_std_after > 0.1}")
     
     print("\nMLP Layer 1 (128 units):")
     print(f"  Weight norm:     {weight_norm_mlp1_final:.6f}")
@@ -774,7 +658,7 @@ def main():
     print(f"  Activation min:  {mlp1_final.min().item():.6f}")
     print(f"  Activation max:  {mlp1_final.max().item():.6f}")
     print(f"  No NaN:          {not torch.isnan(mlp1_final).any().item()}")
-    print(f"  Std > {COLLAPSE_THRESHOLD}:       {mlp1_std_after > COLLAPSE_THRESHOLD}")
+    print(f"  Std > 0.1:       {mlp1_std_after > 0.1}")
     
     print("\nMLP Layer 2 (64 units):")
     print(f"  Weight norm:     {weight_norm_mlp2_final:.6f}")
@@ -783,7 +667,7 @@ def main():
     print(f"  Activation min:  {mlp2_final.min().item():.6f}")
     print(f"  Activation max:  {mlp2_final.max().item():.6f}")
     print(f"  No NaN:          {not torch.isnan(mlp2_final).any().item()}")
-    print(f"  Std > {COLLAPSE_THRESHOLD}:       {mlp2_std_after > COLLAPSE_THRESHOLD}")
+    print(f"  Std > 0.1:       {mlp2_std_after > 0.1}")
     print("="*70)
     
     # Verify all files were created
@@ -791,8 +675,8 @@ def main():
     required_files = [
         'metadata.json',
         'training_logs.json',
-        'collapse_info.json',
         'activations_before.pt',
+        'activations_10000steps.pt',
         'activations_after.pt'
     ]
     
@@ -818,4 +702,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 

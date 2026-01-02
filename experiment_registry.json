@@ -1,0 +1,740 @@
+{
+  "generated_at": "D:\\Bocconi\\Neuroscience\\lpl_project",
+  "total_experiments": 39,
+  "global_seed": 42,
+  "experiments": [
+    {
+      "run_id": "run_001",
+      "dataset": "synthetic_shapes",
+      "architecture": "mlp_1layer_128",
+      "model": "lpl_1layer",
+      "layer_dims": [
+        1024,
+        128
+      ],
+      "steps": 1000,
+      "seed": 42,
+      "learning_rule": "full_lpl",
+      "status": "completed",
+      "notes": [
+        "Analysis results found with seed=0, but metadata says seed=42 (possible seed mismatch)"
+      ]
+    },
+    {
+      "run_id": "run_002",
+      "dataset": "synthetic_shapes",
+      "architecture": "mlp_1layer_128",
+      "model": "lpl_1layer",
+      "layer_dims": [
+        1024,
+        128
+      ],
+      "steps": 5000,
+      "seed": 42,
+      "learning_rule": "full_lpl",
+      "status": "completed",
+      "notes": [
+        "Analysis results found with seed=0, but metadata says seed=42 (possible seed mismatch)"
+      ]
+    },
+    {
+      "run_id": "run_003",
+      "dataset": "synthetic_shapes",
+      "architecture": "mlp_1layer_128",
+      "model": "lpl_1layer",
+      "layer_dims": [
+        1024,
+        128
+      ],
+      "steps": 10000,
+      "seed": 42,
+      "learning_rule": "full_lpl",
+      "status": "completed",
+      "notes": [
+        "Analysis results found with seed=0, but metadata says seed=42 (possible seed mismatch)"
+      ]
+    },
+    {
+      "run_id": "run_004",
+      "dataset": "synthetic_shapes",
+      "architecture": "mlp_1layer_128",
+      "model": "lpl_1layer",
+      "layer_dims": [
+        1024,
+        128
+      ],
+      "steps": 50000,
+      "seed": 42,
+      "learning_rule": "full_lpl",
+      "status": "completed",
+      "notes": [
+        "Analysis results found with seed=0, but metadata says seed=42 (possible seed mismatch)"
+      ]
+    },
+    {
+      "run_id": "run_005",
+      "dataset": "synthetic_shapes",
+      "architecture": "mlp_2layer_128_64",
+      "model": "lpl_2layer",
+      "layer_dims": [
+        1024,
+        128,
+        64
+      ],
+      "steps": 1000,
+      "seed": 42,
+      "learning_rule": "full_lpl",
+      "status": "completed",
+      "notes": [
+        "Analysis results found with seed=0, but metadata says seed=42 (possible seed mismatch)"
+      ]
+    },
+    {
+      "run_id": "run_006",
+      "dataset": "synthetic_shapes",
+      "architecture": "mlp_2layer_128_64",
+      "model": "lpl_2layer",
+      "layer_dims": [
+        1024,
+        128,
+        64
+      ],
+      "steps": 5000,
+      "seed": 42,
+      "learning_rule": "full_lpl",
+      "status": "completed",
+      "notes": [
+        "Analysis results found with seed=0, but metadata says seed=42 (possible seed mismatch)"
+      ]
+    },
+    {
+      "run_id": "run_007",
+      "dataset": "synthetic_shapes",
+      "architecture": "mlp_2layer_128_64",
+      "model": "lpl_2layer",
+      "layer_dims": [
+        1024,
+        128,
+        64
+      ],
+      "steps": 10000,
+      "seed": 42,
+      "learning_rule": "full_lpl",
+      "status": "completed",
+      "notes": [
+        "Analysis results found with seed=0, but metadata says seed=42 (possible seed mismatch)"
+      ]
+    },
+    {
+      "run_id": "run_008",
+      "dataset": "synthetic_shapes",
+      "architecture": "mlp_2layer_128_64",
+      "model": "lpl_2layer",
+      "layer_dims": [
+        1024,
+        128,
+        64
+      ],
+      "steps": 50000,
+      "seed": 42,
+      "learning_rule": "full_lpl",
+      "status": "completed",
+      "notes": [
+        "Analysis results found with seed=0, but metadata says seed=42 (possible seed mismatch)"
+      ]
+    },
+    {
+      "run_id": "run_009",
+      "dataset": "synthetic_shapes",
+      "architecture": "mlp_3layer_128_64_32",
+      "model": "lpl_3layer",
+      "layer_dims": [
+        1024,
+        128,
+        64,
+        32
+      ],
+      "steps": 1000,
+      "seed": 42,
+      "learning_rule": "full_lpl",
+      "status": "completed",
+      "notes": [
+        "Analysis results found with seed=0, but metadata says seed=42 (possible seed mismatch)"
+      ]
+    },
+    {
+      "run_id": "run_010",
+      "dataset": "synthetic_shapes",
+      "architecture": "mlp_3layer_128_64_32",
+      "model": "lpl_3layer",
+      "layer_dims": [
+        1024,
+        128,
+        64,
+        32
+      ],
+      "steps": 5000,
+      "seed": 42,
+      "learning_rule": "full_lpl",
+      "status": "completed",
+      "notes": [
+        "Analysis results found with seed=0, but metadata says seed=42 (possible seed mismatch)"
+      ]
+    },
+    {
+      "run_id": "run_011",
+      "dataset": "synthetic_shapes",
+      "architecture": "mlp_3layer_128_64_32",
+      "model": "lpl_3layer",
+      "layer_dims": [
+        1024,
+        128,
+        64,
+        32
+      ],
+      "steps": 10000,
+      "seed": 42,
+      "learning_rule": "full_lpl",
+      "status": "completed",
+      "notes": [
+        "Analysis results found with seed=0, but metadata says seed=42 (possible seed mismatch)"
+      ]
+    },
+    {
+      "run_id": "run_012",
+      "dataset": "synthetic_shapes",
+      "architecture": "mlp_3layer_128_64_32",
+      "model": "lpl_3layer",
+      "layer_dims": [
+        1024,
+        128,
+        64,
+        32
+      ],
+      "steps": 50000,
+      "seed": 42,
+      "learning_rule": "full_lpl",
+      "status": "completed",
+      "notes": [
+        "Analysis results found with seed=0, but metadata says seed=42 (possible seed mismatch)"
+      ]
+    },
+    {
+      "run_id": "run_013",
+      "dataset": "synthetic_shapes",
+      "architecture": "conv_mlp_hybrid",
+      "model": "conv_mlp_hybrid",
+      "layer_dims": [
+        "conv(1->8,32x32)",
+        8192,
+        32
+      ],
+      "steps": 1000,
+      "seed": 42,
+      "learning_rule": "full_lpl",
+      "status": "completed",
+      "notes": [
+        "Analysis results found with seed=0, but metadata says seed=42 (possible seed mismatch)"
+      ],
+      "max_feasible_steps": 20000,
+      "intended_long_run_steps": 50000
+    },
+    {
+      "run_id": "run_014",
+      "dataset": "synthetic_shapes",
+      "architecture": "conv_mlp_hybrid",
+      "model": "conv_mlp_hybrid",
+      "layer_dims": [
+        "conv(1->8,32x32)",
+        8192,
+        32
+      ],
+      "steps": 5000,
+      "seed": 42,
+      "learning_rule": "full_lpl",
+      "status": "completed",
+      "notes": [
+        "Analysis results found with seed=0, but metadata says seed=42 (possible seed mismatch)"
+      ],
+      "max_feasible_steps": 20000,
+      "intended_long_run_steps": 50000
+    },
+    {
+      "run_id": "run_015",
+      "dataset": "synthetic_shapes",
+      "architecture": "conv_mlp_hybrid",
+      "model": "conv_mlp_hybrid",
+      "layer_dims": [
+        "conv(1->8,32x32)",
+        8192,
+        32
+      ],
+      "steps": 10000,
+      "seed": 42,
+      "learning_rule": "full_lpl",
+      "status": "completed",
+      "notes": [
+        "Analysis results found with seed=0, but metadata says seed=42 (possible seed mismatch)"
+      ],
+      "max_feasible_steps": 20000,
+      "intended_long_run_steps": 50000
+    },
+    {
+      "run_id": "run_016",
+      "dataset": "synthetic_shapes",
+      "architecture": "conv_mlp_hybrid",
+      "model": "conv_mlp_hybrid",
+      "layer_dims": [
+        "conv(1->8,32x32)",
+        8192,
+        32
+      ],
+      "steps": 20000,
+      "seed": 42,
+      "learning_rule": "full_lpl",
+      "status": "completed",
+      "notes": [
+        "Limited to 20k steps due to GPU OOM (intended: 50k)",
+        "Analysis results found with seed=0, but metadata says seed=42 (possible seed mismatch)"
+      ],
+      "max_feasible_steps": 20000,
+      "intended_long_run_steps": 50000
+    },
+    {
+      "run_id": "run_017",
+      "dataset": "synthetic_shapes",
+      "architecture": "mlp_1layer_128",
+      "model": "lpl_1layer",
+      "layer_dims": [
+        1024,
+        128
+      ],
+      "steps": 10000,
+      "seed": 42,
+      "learning_rule": "backprop",
+      "status": "not_started",
+      "notes": [
+        "Analysis results found with seed=0, but metadata says seed=42 (possible seed mismatch)"
+      ]
+    },
+    {
+      "run_id": "run_018",
+      "dataset": "mnist",
+      "architecture": "mlp_1layer_128",
+      "model": "lpl_1layer",
+      "layer_dims": [
+        784,
+        128
+      ],
+      "steps": 1000,
+      "seed": 42,
+      "learning_rule": "full_lpl",
+      "status": "completed",
+      "notes": [
+        "Analysis results found with seed=0, but metadata says seed=42 (possible seed mismatch)"
+      ]
+    },
+    {
+      "run_id": "run_019",
+      "dataset": "mnist",
+      "architecture": "mlp_1layer_128",
+      "model": "lpl_1layer",
+      "layer_dims": [
+        784,
+        128
+      ],
+      "steps": 5000,
+      "seed": 42,
+      "learning_rule": "full_lpl",
+      "status": "completed",
+      "notes": [
+        "Analysis results found with seed=0, but metadata says seed=42 (possible seed mismatch)"
+      ]
+    },
+    {
+      "run_id": "run_020",
+      "dataset": "mnist",
+      "architecture": "mlp_1layer_128",
+      "model": "lpl_1layer",
+      "layer_dims": [
+        784,
+        128
+      ],
+      "steps": 10000,
+      "seed": 42,
+      "learning_rule": "full_lpl",
+      "status": "completed",
+      "notes": [
+        "Analysis results found with seed=0, but metadata says seed=42 (possible seed mismatch)"
+      ]
+    },
+    {
+      "run_id": "run_021",
+      "dataset": "mnist",
+      "architecture": "mlp_1layer_128",
+      "model": "lpl_1layer",
+      "layer_dims": [
+        784,
+        128
+      ],
+      "steps": 50000,
+      "seed": 42,
+      "learning_rule": "full_lpl",
+      "status": "completed",
+      "notes": [
+        "Analysis results found with seed=0, but metadata says seed=42 (possible seed mismatch)"
+      ]
+    },
+    {
+      "run_id": "run_022",
+      "dataset": "mnist",
+      "architecture": "mlp_2layer_128_64",
+      "model": "lpl_2layer",
+      "layer_dims": [
+        784,
+        128,
+        64
+      ],
+      "steps": 1000,
+      "seed": 42,
+      "learning_rule": "full_lpl",
+      "status": "completed",
+      "notes": [
+        "Analysis results found with seed=0, but metadata says seed=42 (possible seed mismatch)"
+      ]
+    },
+    {
+      "run_id": "run_023",
+      "dataset": "mnist",
+      "architecture": "mlp_2layer_128_64",
+      "model": "lpl_2layer",
+      "layer_dims": [
+        784,
+        128,
+        64
+      ],
+      "steps": 5000,
+      "seed": 42,
+      "learning_rule": "full_lpl",
+      "status": "completed",
+      "notes": [
+        "Analysis results found with seed=0, but metadata says seed=42 (possible seed mismatch)"
+      ]
+    },
+    {
+      "run_id": "run_024",
+      "dataset": "mnist",
+      "architecture": "mlp_2layer_128_64",
+      "model": "lpl_2layer",
+      "layer_dims": [
+        784,
+        128,
+        64
+      ],
+      "steps": 10000,
+      "seed": 42,
+      "learning_rule": "full_lpl",
+      "status": "completed",
+      "notes": [
+        "Analysis results found with seed=0, but metadata says seed=42 (possible seed mismatch)"
+      ]
+    },
+    {
+      "run_id": "run_025",
+      "dataset": "mnist",
+      "architecture": "mlp_2layer_128_64",
+      "model": "lpl_2layer",
+      "layer_dims": [
+        784,
+        128,
+        64
+      ],
+      "steps": 50000,
+      "seed": 42,
+      "learning_rule": "full_lpl",
+      "status": "completed",
+      "notes": [
+        "Analysis results found with seed=0, but metadata says seed=42 (possible seed mismatch)"
+      ]
+    },
+    {
+      "run_id": "run_026",
+      "dataset": "mnist",
+      "architecture": "mlp_3layer_128_64_32",
+      "model": "lpl_3layer",
+      "layer_dims": [
+        784,
+        128,
+        64,
+        32
+      ],
+      "steps": 1000,
+      "seed": 42,
+      "learning_rule": "full_lpl",
+      "status": "completed",
+      "notes": [
+        "Analysis results found with seed=0, but metadata says seed=42 (possible seed mismatch)"
+      ]
+    },
+    {
+      "run_id": "run_026",
+      "dataset": "mnist",
+      "architecture": "mlp_3layer_256_128_64",
+      "model": "lpl_3layer",
+      "layer_dims": [
+        784,
+        256,
+        128,
+        64
+      ],
+      "steps": 1000,
+      "seed": 42,
+      "learning_rule": "full_lpl",
+      "status": "completed",
+      "notes": [
+        "Analysis results found with seed=0, but metadata says seed=42 (possible seed mismatch)"
+      ]
+    },
+    {
+      "run_id": "run_027",
+      "dataset": "mnist",
+      "architecture": "mlp_3layer_128_64_32",
+      "model": "lpl_3layer",
+      "layer_dims": [
+        784,
+        128,
+        64,
+        32
+      ],
+      "steps": 5000,
+      "seed": 42,
+      "learning_rule": "full_lpl",
+      "status": "completed",
+      "notes": [
+        "Analysis results found with seed=0, but metadata says seed=42 (possible seed mismatch)"
+      ]
+    },
+    {
+      "run_id": "run_027",
+      "dataset": "mnist",
+      "architecture": "mlp_3layer_256_128_64",
+      "model": "lpl_3layer",
+      "layer_dims": [
+        784,
+        256,
+        128,
+        64
+      ],
+      "steps": 5000,
+      "seed": 42,
+      "learning_rule": "full_lpl",
+      "status": "completed",
+      "notes": [
+        "Analysis results found with seed=0, but metadata says seed=42 (possible seed mismatch)"
+      ]
+    },
+    {
+      "run_id": "run_028",
+      "dataset": "mnist",
+      "architecture": "mlp_3layer_128_64_32",
+      "model": "lpl_3layer",
+      "layer_dims": [
+        784,
+        128,
+        64,
+        32
+      ],
+      "steps": 10000,
+      "seed": 42,
+      "learning_rule": "full_lpl",
+      "status": "completed",
+      "notes": [
+        "Analysis results found with seed=0, but metadata says seed=42 (possible seed mismatch)"
+      ]
+    },
+    {
+      "run_id": "run_028",
+      "dataset": "mnist",
+      "architecture": "mlp_3layer_256_128_64",
+      "model": "lpl_3layer",
+      "layer_dims": [
+        784,
+        256,
+        128,
+        64
+      ],
+      "steps": 10000,
+      "seed": 42,
+      "learning_rule": "full_lpl",
+      "status": "completed",
+      "notes": [
+        "Analysis results found with seed=0, but metadata says seed=42 (possible seed mismatch)"
+      ]
+    },
+    {
+      "run_id": "run_029",
+      "dataset": "mnist",
+      "architecture": "mlp_3layer_128_64_32",
+      "model": "lpl_3layer",
+      "layer_dims": [
+        784,
+        128,
+        64,
+        32
+      ],
+      "steps": 50000,
+      "seed": 42,
+      "learning_rule": "full_lpl",
+      "status": "completed",
+      "notes": [
+        "Analysis results found with seed=0, but metadata says seed=42 (possible seed mismatch)",
+        "layer1 COLLAPSED: std=0.094509",
+        "layer2 COLLAPSED: std=0.014472"
+      ]
+    },
+    {
+      "run_id": "run_029",
+      "dataset": "mnist",
+      "architecture": "mlp_3layer_256_128_64",
+      "model": "lpl_3layer",
+      "layer_dims": [
+        784,
+        256,
+        128,
+        64
+      ],
+      "steps": 50000,
+      "seed": 42,
+      "learning_rule": "full_lpl",
+      "status": "completed",
+      "notes": [
+        "Analysis results found with seed=0, but metadata says seed=42 (possible seed mismatch)",
+        "layer1 COLLAPSED: std=0.094509",
+        "layer2 COLLAPSED: std=0.014472"
+      ]
+    },
+    {
+      "run_id": "run_030",
+      "dataset": "mnist",
+      "architecture": "conv_mlp_hybrid",
+      "model": "conv_mlp_hybrid",
+      "layer_dims": [
+        "conv(1->16,28x28)",
+        12544,
+        128,
+        64
+      ],
+      "steps": 1000,
+      "seed": 42,
+      "learning_rule": "full_lpl",
+      "status": "completed",
+      "notes": [
+        "Analysis results found with seed=0, but metadata says seed=42 (possible seed mismatch)"
+      ],
+      "max_feasible_steps": 20000,
+      "intended_long_run_steps": 50000
+    },
+    {
+      "run_id": "run_031",
+      "dataset": "mnist",
+      "architecture": "conv_mlp_hybrid",
+      "model": "conv_mlp_hybrid",
+      "layer_dims": [
+        "conv(1->16,28x28)",
+        12544,
+        128,
+        64
+      ],
+      "steps": 5000,
+      "seed": 42,
+      "learning_rule": "full_lpl",
+      "status": "completed",
+      "notes": [
+        "Analysis results found with seed=0, but metadata says seed=42 (possible seed mismatch)"
+      ],
+      "max_feasible_steps": 20000,
+      "intended_long_run_steps": 50000
+    },
+    {
+      "run_id": "run_032",
+      "dataset": "mnist",
+      "architecture": "conv_mlp_hybrid",
+      "model": "conv_mlp_hybrid",
+      "layer_dims": [
+        "conv(1->16,28x28)",
+        12544,
+        128,
+        64
+      ],
+      "steps": 10000,
+      "seed": 42,
+      "learning_rule": "full_lpl",
+      "status": "completed",
+      "notes": [
+        "Analysis results found with seed=0, but metadata says seed=42 (possible seed mismatch)"
+      ],
+      "max_feasible_steps": 20000,
+      "intended_long_run_steps": 50000
+    },
+    {
+      "run_id": "run_033",
+      "dataset": "mnist",
+      "architecture": "conv_mlp_hybrid",
+      "model": "conv_mlp_hybrid",
+      "layer_dims": [
+        "conv(1->16,28x28)",
+        12544,
+        128,
+        64
+      ],
+      "steps": 50000,
+      "seed": 42,
+      "learning_rule": "full_lpl",
+      "status": "completed",
+      "notes": [
+        "Analysis results found with seed=0, but metadata says seed=42 (possible seed mismatch)"
+      ],
+      "max_feasible_steps": 20000,
+      "intended_long_run_steps": 50000
+    },
+    {
+      "run_id": "run_034",
+      "dataset": "mnist",
+      "architecture": "mlp_1layer_128",
+      "model": "lpl_1layer",
+      "layer_dims": [
+        784,
+        128
+      ],
+      "steps": 10000,
+      "seed": 42,
+      "learning_rule": "backprop",
+      "status": "not_started",
+      "notes": [
+        "Analysis results found with seed=0, but metadata says seed=42 (possible seed mismatch)"
+      ]
+    },
+    {
+      "run_id": "run_035",
+      "dataset": "mnist",
+      "architecture": "conv_mlp_hybrid",
+      "model": "conv_mlp_hybrid",
+      "layer_dims": [
+        "conv(1->16,28x28)",
+        12544,
+        128,
+        64
+      ],
+      "steps": 20000,
+      "seed": 42,
+      "learning_rule": "full_lpl",
+      "status": "completed",
+      "notes": [
+        "Limited to 20k steps due to GPU OOM (intended: 50k)",
+        "Analysis results found with seed=0, but metadata says seed=42 (possible seed mismatch)"
+      ],
+      "max_feasible_steps": 20000,
+      "intended_long_run_steps": 50000
+    }
+  ]
+}

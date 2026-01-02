@@ -111,14 +111,14 @@ def main():
     EXPERIMENT_CONFIG = {
         'dataset': 'mnist',
         'steps': 5000,
-        'architecture': 'mlp_3layer_256_128_64',
+        'architecture': 'mlp_3layer_128_64_32',
         'activation': 'tanh',
         'rule': 'full_lpl',
         'baseline': 'none',
         'd_in': 28 * 28,  # 28x28 images flattened to 784
-        'd_hidden1': 256,  # First layer output dimension
-        'd_hidden2': 128,  # Second layer output dimension
-        'd_out': 64,       # Third layer output dimension (final representation)
+        'd_hidden1': 128,  # First layer output dimension
+        'd_hidden2': 64,   # Second layer output dimension
+        'd_out': 32,       # Third layer output dimension (final representation)
         'lr_hebb': 0.001,
         'lr_pred': 0.001,
         'lr_stab': 0.0005,
@@ -182,7 +182,7 @@ def main():
         use_stab=True    # Full LPL
     )
     
-    # Create model (3-layer MLP: 784 → 256 → 128 → 64)
+    # Create model (3-layer MLP: 784 → 128 → 64 → 32)
     model = HierarchicalLPL3Layer(
         d_in=EXPERIMENT_CONFIG['d_in'],
         d_hidden1=EXPERIMENT_CONFIG['d_hidden1'],
@@ -444,5 +444,6 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 

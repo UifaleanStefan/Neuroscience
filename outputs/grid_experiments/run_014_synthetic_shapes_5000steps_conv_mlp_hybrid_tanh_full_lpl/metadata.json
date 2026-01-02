@@ -5,15 +5,18 @@
   "activation": "tanh",
   "rule": "full_lpl",
   "baseline": "none",
-  "seed": 42,
   "input_channels": 1,
   "input_size": 32,
-  "conv_out_channels": 8,
+  "conv_out_channels": 16,
   "conv_kernel_size": 3,
-  "d_out": 32,
-  "use_pooling": true,
+  "conv_stride": 1,
+  "conv_padding": 1,
+  "mlp_hidden": 128,
+  "mlp_out": 64,
   "lr_hebb": 0.001,
   "lr_pred": 0.001,
   "lr_stab": 0.0005,
-  "device": "cuda"
+  "seed": 42,
+  "translate_range": 2,
+  "noise_std": 0.05
 }
