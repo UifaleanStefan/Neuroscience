@@ -1,8 +1,8 @@
 """
-Grid Experiment #031: MNIST with Conv-MLP Hybrid (5k steps)
+Grid Experiment #083: STL-10 with Conv-MLP Hybrid (5k steps)
 
 Configuration:
-- Dataset: MNIST (grayscale, 28x28 images)
+- Dataset: STL-10 (RGB, 96x96 images)
 - Training steps: 5,000
 - Architecture: Conv-MLP Hybrid
   - Conv layer: 16 channels, kernel 5, stride 1, padding 2
@@ -27,7 +27,7 @@ project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
 from lpl_core.hierarchical_lpl import HierarchicalLPL
-from data.mnist import MNISTTemporalPairDataset, create_mnist_temporal_pair_dataset
+from data.stl10 import STL10TemporalPairDataset, create_stl10_temporal_pair_dataset
 
 
 class LayerConfig:
@@ -65,8 +65,8 @@ class ConvMLPHybrid2Layer:
         Initialize Conv-MLP Hybrid model with 2-layer MLP.
         
         Args:
-            input_channels: Number of input channels (1 for grayscale)
-            input_size: Input image size (28 for 28x28)
+            input_channels: Number of input channels (3 for RGB)
+            input_size: Input image size (28 for 96x96)
             conv_out_channels: Number of output channels from conv layer
             conv_kernel_size: Kernel size for conv layer
             conv_stride: Stride for conv layer
@@ -94,7 +94,7 @@ class ConvMLPHybrid2Layer:
         # but keep requires_grad=True in case you want to train it with backprop later
         
         # Calculate flattened conv output size
-        # With padding=2, kernel=5, stride=1: output size = input_size (28x28)
+        # With padding=2, kernel=5, stride=1: output size = input_size (96x96)
         conv_output_size = conv_out_channels * input_size * input_size
         
         # Create 2-layer MLP using HierarchicalLPL
@@ -113,7 +113,7 @@ class ConvMLPHybrid2Layer:
         Forward pass through conv and MLP layers.
         
         Args:
-            x: Input tensor of shape (H, W) for grayscale image, or (C, H, W)
+            x: Input tensor of shape (H, W) for RGB image, or (C, H, W)
             return_conv_features: If True, also return conv feature maps
             
         Returns:
@@ -122,7 +122,7 @@ class ConvMLPHybrid2Layer:
         """
         # Ensure x is 3D: (C, H, W)
         if x.dim() == 2:
-            x = x.unsqueeze(0)  # Add channel dimension: (1, H, W)
+            x = x.unsqueeze(0)  # Add channel dimension if needed: (1, H, W) for grayscale or (3, H, W) for RGB
         elif x.dim() == 1:
             # If flattened, reshape to 2D then add channel
             size = int(x.shape[0] ** 0.5)
@@ -158,10 +158,17 @@ class ConvMLPHybrid2Layer:
         # Process inputs through conv layer to get features
         # Handle different input formats
         if x_t.dim() == 1:
-            # Flattened input - reshape to 2D
-            size = int(x_t.shape[0] ** 0.5)
-            x_t = x_t.reshape(size, size)
-            x_t1 = x_t1.reshape(size, size)
+            # Flattened input - reshape to (C, H, W)
+            # For STL-10: 3*96 * 96 = 27648
+            if x_t.shape[0] == 3 * 96 * 96:
+                # RGB image: reshape to (3, 96, 96)
+                x_t = x_t.reshape(3, 96, 96)
+                x_t1 = x_t1.reshape(3, 96, 96)
+            else:
+                # Assume grayscale: reshape to (1, H, W)
+                size = int(x_t.shape[0] ** 0.5)
+                x_t = x_t.reshape(1, size, size)
+                x_t1 = x_t1.reshape(1, size, size)
         
         # Ensure x_t and x_t1 are 3D: (C, H, W)
         if x_t.dim() == 2:
@@ -197,7 +204,7 @@ def export_activations(model, dataset, num_samples=1000):
     
     Args:
         model: ConvMLPHybrid2Layer model
-        dataset: MNISTTemporalPairDataset (can be temporal pair or single image mode)
+        dataset: STL10TemporalPairDataset (can be temporal pair or single image mode)
         num_samples: Number of samples to export
         
     Returns:
@@ -216,7 +223,7 @@ def export_activations(model, dataset, num_samples=1000):
         else:
             image, label = dataset[i]
         
-        # Image should be 2D (H, W) from MNIST
+        # Image should be 3D (3, 96, 96) from STL-10
         # Ensure input is float32 and in [0,1] range
         if image.dtype != torch.float32:
             image = image.float()
@@ -224,7 +231,12 @@ def export_activations(model, dataset, num_samples=1000):
         
         # Forward pass to get activations
         # Ensure image is 3D: (C, H, W)
-        image_3d = image.unsqueeze(0) if image.dim() == 2 else image
+        if image.dim() == 2:
+            image = image.unsqueeze(0)  # Add channel dimension
+        elif image.dim() == 1:
+            # Flattened - reshape to (3, 96, 96)
+            image = image.reshape(3, 96, 96)
+        image_3d = image
         
         with torch.no_grad():
             # Get conv features
@@ -260,21 +272,21 @@ def export_activations(model, dataset, num_samples=1000):
 
 def main():
     """
-    Run grid experiment #031.
+    Run grid experiment #083.
     """
     # Fixed random seed for reproducibility
     torch.manual_seed(42)
     
     # Experiment configuration
     EXPERIMENT_CONFIG = {
-        'dataset': 'mnist',
+        'dataset': 'stl10',
         'steps': 5000,
         'architecture': 'conv_mlp_hybrid',
         'activation': 'tanh',
         'rule': 'full_lpl',
         'baseline': 'none',
-        'input_channels': 1,        # Grayscale
-        'input_size': 28,           # 28x28 images
+        'input_channels': 3,        # RGB
+        'input_size': 96,           # 96x96 images
         'conv_out_channels': 16,   # Number of conv output channels
         'conv_kernel_size': 5,      # 5x5 conv kernel
         'conv_stride': 1,           # Stride 1
@@ -285,12 +297,12 @@ def main():
         'lr_pred': 0.001,
         'lr_stab': 0.0005,
         'seed': 42,
-        'translate_range': 2,
+        'translate_range': 4,
         'noise_std': 0.05
     }
     
     print("="*70)
-    print("GRID EXPERIMENT #031".center(70))
+    print("GRID EXPERIMENT #083".center(70))
     print("="*70)
     print(f"Dataset: {EXPERIMENT_CONFIG['dataset']}")
     print(f"Steps: {EXPERIMENT_CONFIG['steps']}")
@@ -307,7 +319,7 @@ def main():
     
     # Create output directory with experiment identifier
     output_base = Path('outputs/grid_experiments')
-    output_dir = output_base / "run_031_mnist_5000steps_conv_mlp_tanh_full_lpl"
+    output_dir = output_base / "run_083_stl10_5000steps_conv_mlp_tanh_full_lpl"
     output_dir.mkdir(parents=True, exist_ok=True)
     
     # Save metadata
@@ -352,8 +364,8 @@ def main():
     
     # Create datasets
     # For activation export: single images (not temporal pairs)
-    export_dataset = MNISTTemporalPairDataset(
-        train=True,
+    export_dataset = STL10TemporalPairDataset(
+        split='train',
         return_temporal_pair=False,
         translate_range=EXPERIMENT_CONFIG['translate_range'],
         noise_std=EXPERIMENT_CONFIG['noise_std'],
@@ -361,8 +373,8 @@ def main():
     )
     
     # For training: temporal pairs
-    train_dataset = create_mnist_temporal_pair_dataset(
-        train=True,
+    train_dataset = create_stl10_temporal_pair_dataset(
+        split='train',
         translate_range=EXPERIMENT_CONFIG['translate_range'],
         noise_std=EXPERIMENT_CONFIG['noise_std'],
         seed=EXPERIMENT_CONFIG['seed']
@@ -664,7 +676,5 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
 
 

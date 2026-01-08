@@ -1,4 +1,4 @@
-"""Fashion-MNIST dataset loading with temporal pair support for LPL training."""
+"""CIFAR-10 dataset loading with temporal pair support for LPL training."""
 
 import torch
 import torchvision
@@ -7,9 +7,9 @@ from torch.utils.data import Dataset
 import torch.nn.functional as F
 
 
-class FashionMNISTTemporalPairDataset(Dataset):
+class CIFAR10TemporalPairDataset(Dataset):
     """
-    Fashion-MNIST dataset with temporal pair support for LPL training.
+    CIFAR-10 dataset with temporal pair support for LPL training.
     
     Creates temporal pairs by applying small random transformations:
     - Translation (±2 pixels)
@@ -24,10 +24,10 @@ class FashionMNISTTemporalPairDataset(Dataset):
                  noise_std=0.05,
                  seed=None):
         """
-        Initialize Fashion-MNIST dataset.
+        Initialize CIFAR-10 dataset.
         
         Args:
-            root: Root directory for Fashion-MNIST data
+            root: Root directory for CIFAR-10 data
             train: If True, use training set; else use test set
             return_temporal_pair: If True, returns (x_t, x_t1, label) instead of (image, label)
             translate_range: Maximum translation in pixels (±translate_range)
@@ -38,13 +38,13 @@ class FashionMNISTTemporalPairDataset(Dataset):
         self.translate_range = translate_range
         self.noise_std = noise_std
         
-        # Load Fashion-MNIST dataset
-        # Fashion-MNIST images are 28x28, we'll keep them as is (same as MNIST)
+        # Load CIFAR-10 dataset
+        # CIFAR-10 images are 32x32 RGB (3 channels)
         transform = transforms.Compose([
             transforms.ToTensor(),  # Converts PIL to tensor and scales to [0,1]
         ])
         
-        self.dataset = torchvision.datasets.FashionMNIST(
+        self.dataset = torchvision.datasets.CIFAR10(
             root=root,
             train=train,
             download=True,
@@ -64,16 +64,25 @@ class FashionMNISTTemporalPairDataset(Dataset):
         Apply translation to image using padding and cropping.
         
         Args:
-            image: Tensor of shape (1, H, W) or (H, W)
+            image: Tensor of shape (3, H, W) or (H, W, 3) or (H, W)
             translate_x: Translation in x direction (pixels)
             translate_y: Translation in y direction (pixels)
             
         Returns:
-            Translated image tensor
+            Translated image tensor of shape (3, H, W)
         """
-        # Ensure image is 3D (1, H, W)
-        if image.dim() == 2:
-            image = image.unsqueeze(0)
+        # Ensure image is 3D (C, H, W) where C=3 for RGB
+        if image.dim() == 3:
+            if image.shape[0] == 3:
+                pass  # Already (3, H, W)
+            elif image.shape[2] == 3:
+                image = image.permute(2, 0, 1)  # (H, W, 3) -> (3, H, W)
+            else:
+                raise ValueError(f"Unexpected 3D image shape: {image.shape}")
+        elif image.dim() == 2:
+            raise ValueError(f"2D image shape not supported for CIFAR-10 (expecting 3 channels)")
+        else:
+            raise ValueError(f"Unexpected image shape: {image.shape}")
         
         # Pad image to allow translation
         pad_size = abs(translate_x) + abs(translate_y) + 1
@@ -87,14 +96,14 @@ class FashionMNISTTemporalPairDataset(Dataset):
         # Crop back to original size
         translated = padded[:, start_y:start_y+h, start_x:start_x+w]
         
-        return translated.squeeze(0) if image.dim() == 2 else translated
+        return translated
     
     def _apply_noise(self, image, noise_std):
         """
         Add Gaussian noise to image.
         
         Args:
-            image: Tensor of shape (H, W) or (1, H, W)
+            image: Tensor of shape (3, H, W)
             noise_std: Standard deviation of noise
             
         Returns:
@@ -109,15 +118,22 @@ class FashionMNISTTemporalPairDataset(Dataset):
         Apply random transformations to create a view of the image.
         
         Args:
-            image: Original image tensor (1, 28, 28) or (28, 28)
+            image: Original image tensor (3, 32, 32) for CIFAR-10
             transform_seed: Seed for deterministic transformations
             
         Returns:
-            Transformed image tensor of shape (28, 28)
+            Transformed image tensor of shape (3, 32, 32)
         """
-        # Ensure image is 2D (28, 28) for processing
+        # Ensure image is (3, H, W)
         if image.dim() == 3:
-            image = image.squeeze(0)
+            if image.shape[0] == 3:
+                pass  # Already (3, H, W)
+            elif image.shape[2] == 3:
+                image = image.permute(2, 0, 1)  # (H, W, 3) -> (3, H, W)
+            else:
+                raise ValueError(f"Unexpected 3D image shape: {image.shape}")
+        else:
+            raise ValueError(f"Unexpected image shape: {image.shape}, expected (3, H, W)")
         
         # Use generator for reproducibility if seed provided
         if transform_seed is not None:
@@ -140,9 +156,8 @@ class FashionMNISTTemporalPairDataset(Dataset):
         # Apply noise
         transformed = self._apply_noise(translated, noise_scale)
         
-        # Ensure output is (28, 28)
-        if transformed.dim() == 3:
-            transformed = transformed.squeeze(0)
+        # Ensure output is (3, 32, 32)
+        assert transformed.shape == (3, 32, 32), f"Unexpected output shape: {transformed.shape}"
         
         return transformed
     
@@ -156,17 +171,20 @@ class FashionMNISTTemporalPairDataset(Dataset):
         Returns:
             If return_temporal_pair=False: (image, label)
             If return_temporal_pair=True: (x_t, x_t1, label)
-            where images are tensors of shape (28, 28) in [0, 1]
+            where images are tensors of shape (3, 32, 32) in [0, 1]
         """
-        # Get original image and label from Fashion-MNIST
+        # Get original image and label from CIFAR-10
         image, label = self.dataset[idx]
         
-        # Fashion-MNIST returns (1, 28, 28) tensor, convert to (28, 28) for consistency
-        # Squeeze channel dimension
+        # CIFAR-10 returns (3, 32, 32) tensor via ToTensor()
+        # Ensure it's in the correct format
         if image.dim() == 3:
-            image = image.squeeze(0)
-        elif image.dim() == 2:
-            pass  # Already (28, 28)
+            if image.shape[0] == 3:
+                pass  # Already (3, 32, 32)
+            elif image.shape[2] == 3:
+                image = image.permute(2, 0, 1)  # (32, 32, 3) -> (3, 32, 32)
+            else:
+                raise ValueError(f"Unexpected image shape: {image.shape}")
         else:
             raise ValueError(f"Unexpected image shape: {image.shape}")
         
@@ -183,18 +201,18 @@ class FashionMNISTTemporalPairDataset(Dataset):
 
 
 # Convenience function for creating temporal pair datasets
-def create_fashion_mnist_temporal_pair_dataset(train=True, **kwargs):
+def create_cifar10_temporal_pair_dataset(train=True, **kwargs):
     """
-    Create a Fashion-MNIST dataset that returns temporal pairs (x_t, x_t1, label).
+    Create a CIFAR-10 dataset that returns temporal pairs (x_t, x_t1, label).
     
     Args:
         train: If True, use training set; else use test set
-        **kwargs: Additional arguments passed to FashionMNISTTemporalPairDataset
+        **kwargs: Additional arguments passed to CIFAR10TemporalPairDataset
         
     Returns:
-        FashionMNISTTemporalPairDataset configured for temporal pairs
+        CIFAR10TemporalPairDataset configured for temporal pairs
     """
-    return FashionMNISTTemporalPairDataset(
+    return CIFAR10TemporalPairDataset(
         train=train,
         return_temporal_pair=True,
         **kwargs
@@ -203,22 +221,21 @@ def create_fashion_mnist_temporal_pair_dataset(train=True, **kwargs):
 
 if __name__ == "__main__":
     # Test the dataset
-    print("Testing FashionMNISTTemporalPairDataset...")
+    print("Testing CIFAR10TemporalPairDataset...")
     
     # Test single image mode
-    dataset = FashionMNISTTemporalPairDataset(train=True, return_temporal_pair=False, seed=42)
+    dataset = CIFAR10TemporalPairDataset(train=True, return_temporal_pair=False, seed=42)
     image, label = dataset[0]
     print(f"Single image mode: image shape={image.shape}, label={label}, dtype={image.dtype}")
     print(f"Image range: [{image.min().item():.3f}, {image.max().item():.3f}]")
     
     # Test temporal pair mode
-    temporal_dataset = create_fashion_mnist_temporal_pair_dataset(train=True, seed=42)
+    temporal_dataset = create_cifar10_temporal_pair_dataset(train=True, seed=42)
     x_t, x_t1, label = temporal_dataset[0]
     print(f"\nTemporal pair mode: x_t shape={x_t.shape}, x_t1 shape={x_t1.shape}, label={label}")
     print(f"x_t range: [{x_t.min().item():.3f}, {x_t.max().item():.3f}]")
     print(f"x_t1 range: [{x_t1.min().item():.3f}, {x_t1.max().item():.3f}]")
     
     print("\nDataset test completed successfully!")
-
 
 

@@ -1,10 +1,10 @@
 """
-Grid Experiment #025: MNIST with 2-layer MLP (50k steps)
+Grid Experiment #077: STL-10 with 2-layer MLP (50k steps)
 
 Configuration:
-- Dataset: MNIST (grayscale, 28x28 images, flattened to 784)
+- Dataset: STL-10 (RGB, 96x96 images, flattened to 27648)
 - Training steps: 50,000
-- Architecture: 2-layer MLP (784 → 128 → 64 units)
+- Architecture: 2-layer MLP (27648 → 128 → 64 units)
 - Activation: tanh (scaled, same as previous runs)
 - Learning rule: full LPL (Hebbian + Predictive + Stabilization enabled) on both layers
 - Temporal pairs: Translation + noise transformations
@@ -22,7 +22,7 @@ project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
 from lpl_core.hierarchical_lpl import HierarchicalLPL
-from data.mnist import MNISTTemporalPairDataset, create_mnist_temporal_pair_dataset
+from data.stl10 import STL10TemporalPairDataset, create_stl10_temporal_pair_dataset
 
 
 class LayerConfig:
@@ -43,7 +43,7 @@ def export_activations(model, dataset, num_samples=1000):
     
     Args:
         model: HierarchicalLPL model
-        dataset: MNISTTemporalPairDataset (can be temporal pair or single image mode)
+        dataset: STL10TemporalPairDataset (can be temporal pair or single image mode)
         num_samples: Number of samples to export
         
     Returns:
@@ -61,7 +61,7 @@ def export_activations(model, dataset, num_samples=1000):
         else:
             image, label = dataset[i]
         
-        # Flatten image to 1D tensor (28x28 = 784)
+        # Flatten image to 1D tensor (3x96x96 = 27648)
         x = image.flatten()
         
         # Ensure input is float32 and in [0,1] range
@@ -94,32 +94,32 @@ def export_activations(model, dataset, num_samples=1000):
 
 def main():
     """
-    Run grid experiment #025.
+    Run grid experiment #077.
     """
     # Fixed random seed for reproducibility
     torch.manual_seed(42)
     
     # Experiment configuration
     EXPERIMENT_CONFIG = {
-        'dataset': 'mnist',
+        'dataset': 'stl10',
         'steps': 50000,
         'architecture': 'mlp_2layer_128_64',
         'activation': 'tanh',
         'rule': 'full_lpl',
         'baseline': 'none',
-        'd_in': 28 * 28,  # 28x28 images flattened to 784
+        'd_in': 3 * 96 * 96,  # 3x96x96 images flattened to 27648
         'd_hidden': 128,   # First layer output dimension
         'd_out': 64,       # Second layer output dimension (final representation)
         'lr_hebb': 0.001,
         'lr_pred': 0.001,
         'lr_stab': 0.0005,
         'seed': 42,
-        'translate_range': 2,
+        'translate_range': 4,
         'noise_std': 0.05
     }
     
     print("="*70)
-    print("GRID EXPERIMENT #025".center(70))
+    print("GRID EXPERIMENT #077".center(70))
     print("="*70)
     print(f"Dataset: {EXPERIMENT_CONFIG['dataset']}")
     print(f"Steps: {EXPERIMENT_CONFIG['steps']}")
@@ -127,14 +127,14 @@ def main():
     print(f"Activation: {EXPERIMENT_CONFIG['activation']}")
     print(f"Rule: {EXPERIMENT_CONFIG['rule']}")
     print(f"Baseline: {EXPERIMENT_CONFIG['baseline']}")
-    print(f"Input dimension: {EXPERIMENT_CONFIG['d_in']} (28x28 flattened)")
+    print(f"Input dimension: {EXPERIMENT_CONFIG['d_in']} (3x96x96 flattened)")
     print(f"Layer 1 output: {EXPERIMENT_CONFIG['d_hidden']}")
     print(f"Layer 2 output: {EXPERIMENT_CONFIG['d_out']}")
     print("="*70)
     
     # Create output directory with experiment identifier
     output_base = Path('outputs/grid_experiments')
-    output_dir = output_base / f"run_025_{EXPERIMENT_CONFIG['dataset']}_{EXPERIMENT_CONFIG['steps']}steps_{EXPERIMENT_CONFIG['architecture']}_{EXPERIMENT_CONFIG['activation']}_{EXPERIMENT_CONFIG['rule']}"
+    output_dir = output_base / f"run_077_{EXPERIMENT_CONFIG['dataset']}_{EXPERIMENT_CONFIG['steps']}steps_{EXPERIMENT_CONFIG['architecture']}_{EXPERIMENT_CONFIG['activation']}_{EXPERIMENT_CONFIG['rule']}"
     output_dir.mkdir(parents=True, exist_ok=True)
     
     # Save metadata
@@ -163,7 +163,7 @@ def main():
         use_stab=True    # Full LPL
     )
     
-    # Create model (2-layer MLP: 784 → 128 → 64)
+    # Create model (2-layer MLP: 27648 → 128 → 64)
     model = HierarchicalLPL(
         d_in=EXPERIMENT_CONFIG['d_in'],
         d_hidden=EXPERIMENT_CONFIG['d_hidden'],
@@ -174,8 +174,8 @@ def main():
     
     # Create datasets
     # For activation export: single images (not temporal pairs)
-    export_dataset = MNISTTemporalPairDataset(
-        train=True,
+    export_dataset = STL10TemporalPairDataset(
+        split='train',
         return_temporal_pair=False,
         translate_range=EXPERIMENT_CONFIG['translate_range'],
         noise_std=EXPERIMENT_CONFIG['noise_std'],
@@ -183,8 +183,8 @@ def main():
     )
     
     # For training: temporal pairs
-    train_dataset = create_mnist_temporal_pair_dataset(
-        train=True,
+    train_dataset = create_stl10_temporal_pair_dataset(
+        split='train',
         translate_range=EXPERIMENT_CONFIG['translate_range'],
         noise_std=EXPERIMENT_CONFIG['noise_std'],
         seed=EXPERIMENT_CONFIG['seed']
@@ -235,7 +235,7 @@ def main():
         idx = torch.randint(0, len(train_dataset), (1,)).item()
         x_t, x_t1, _ = train_dataset[idx]
         
-        # Flatten images to 1D tensors (28x28 = 784)
+        # Flatten images to 1D tensors (3x96x96 = 27648)
         x_t_flat = x_t.flatten()
         x_t1_flat = x_t1.flatten()
         
@@ -379,8 +379,6 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
 
 
 

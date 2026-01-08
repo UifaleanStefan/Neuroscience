@@ -2,6 +2,20 @@
 
 This repository contains the implementation and experiments for research on Latent Predictive Learning (LPL), a framework for learning predictive representations in neural networks using local learning rules (no backpropagation).
 
+## 📚 **IMPORTANT: Complete Project Documentation**
+
+**For comprehensive project documentation, see:**
+- **[PROJECT_DOCUMENTATION.md](PROJECT_DOCUMENTATION.md)** - Complete project overview, experiment structure, datasets, and status
+- **[HANDOFF_NOTES.md](HANDOFF_NOTES.md)** - Quick reference for handoff between sessions
+- **[TECHNICAL_REFERENCE.md](TECHNICAL_REFERENCE.md)** - Technical implementation details and patterns
+
+**Current Status**: ✅ All 85 experiments complete (17 per dataset × 5 datasets)
+- Synthetic Shapes: run_001-017
+- MNIST: run_018-034
+- Fashion-MNIST: run_036-052
+- CIFAR-10: run_053-069
+- STL-10: run_070-086
+
 ## Overview
 
 LPL combines three learning mechanisms:

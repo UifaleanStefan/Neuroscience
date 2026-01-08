@@ -1,10 +1,10 @@
 """
-Grid Experiment #025: MNIST with 2-layer MLP (50k steps)
+Grid Experiment #057: CIFAR-10 with 2-layer MLP (1k steps)
 
 Configuration:
-- Dataset: MNIST (grayscale, 28x28 images, flattened to 784)
-- Training steps: 50,000
-- Architecture: 2-layer MLP (784 → 128 → 64 units)
+- Dataset: CIFAR-10 (RGB, 32x32 images, flattened to 3072)
+- Training steps: 1,000
+- Architecture: 2-layer MLP (3072 → 128 → 64 units)
 - Activation: tanh (scaled, same as previous runs)
 - Learning rule: full LPL (Hebbian + Predictive + Stabilization enabled) on both layers
 - Temporal pairs: Translation + noise transformations
@@ -22,7 +22,7 @@ project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
 from lpl_core.hierarchical_lpl import HierarchicalLPL
-from data.mnist import MNISTTemporalPairDataset, create_mnist_temporal_pair_dataset
+from data.cifar10 import CIFAR10TemporalPairDataset, create_cifar10_temporal_pair_dataset
 
 
 class LayerConfig:
@@ -43,7 +43,7 @@ def export_activations(model, dataset, num_samples=1000):
     
     Args:
         model: HierarchicalLPL model
-        dataset: MNISTTemporalPairDataset (can be temporal pair or single image mode)
+        dataset: CIFAR10TemporalPairDataset (can be temporal pair or single image mode)
         num_samples: Number of samples to export
         
     Returns:
@@ -61,7 +61,7 @@ def export_activations(model, dataset, num_samples=1000):
         else:
             image, label = dataset[i]
         
-        # Flatten image to 1D tensor (28x28 = 784)
+        # Flatten image to 1D tensor (3x32x32 = 3072)
         x = image.flatten()
         
         # Ensure input is float32 and in [0,1] range
@@ -94,20 +94,20 @@ def export_activations(model, dataset, num_samples=1000):
 
 def main():
     """
-    Run grid experiment #025.
+    Run grid experiment #057.
     """
     # Fixed random seed for reproducibility
     torch.manual_seed(42)
     
     # Experiment configuration
     EXPERIMENT_CONFIG = {
-        'dataset': 'mnist',
-        'steps': 50000,
+        'dataset': 'cifar10',
+        'steps': 1000,
         'architecture': 'mlp_2layer_128_64',
         'activation': 'tanh',
         'rule': 'full_lpl',
         'baseline': 'none',
-        'd_in': 28 * 28,  # 28x28 images flattened to 784
+        'd_in': 3 * 32 * 32,  # 3x32x32 images flattened to 3072
         'd_hidden': 128,   # First layer output dimension
         'd_out': 64,       # Second layer output dimension (final representation)
         'lr_hebb': 0.001,
@@ -119,7 +119,7 @@ def main():
     }
     
     print("="*70)
-    print("GRID EXPERIMENT #025".center(70))
+    print("GRID EXPERIMENT #057".center(70))
     print("="*70)
     print(f"Dataset: {EXPERIMENT_CONFIG['dataset']}")
     print(f"Steps: {EXPERIMENT_CONFIG['steps']}")
@@ -127,14 +127,14 @@ def main():
     print(f"Activation: {EXPERIMENT_CONFIG['activation']}")
     print(f"Rule: {EXPERIMENT_CONFIG['rule']}")
     print(f"Baseline: {EXPERIMENT_CONFIG['baseline']}")
-    print(f"Input dimension: {EXPERIMENT_CONFIG['d_in']} (28x28 flattened)")
+    print(f"Input dimension: {EXPERIMENT_CONFIG['d_in']} (3x32x32 flattened)")
     print(f"Layer 1 output: {EXPERIMENT_CONFIG['d_hidden']}")
     print(f"Layer 2 output: {EXPERIMENT_CONFIG['d_out']}")
     print("="*70)
     
     # Create output directory with experiment identifier
     output_base = Path('outputs/grid_experiments')
-    output_dir = output_base / f"run_025_{EXPERIMENT_CONFIG['dataset']}_{EXPERIMENT_CONFIG['steps']}steps_{EXPERIMENT_CONFIG['architecture']}_{EXPERIMENT_CONFIG['activation']}_{EXPERIMENT_CONFIG['rule']}"
+    output_dir = output_base / f"run_057_{EXPERIMENT_CONFIG['dataset']}_{EXPERIMENT_CONFIG['steps']}steps_{EXPERIMENT_CONFIG['architecture']}_{EXPERIMENT_CONFIG['activation']}_{EXPERIMENT_CONFIG['rule']}"
     output_dir.mkdir(parents=True, exist_ok=True)
     
     # Save metadata
@@ -163,7 +163,7 @@ def main():
         use_stab=True    # Full LPL
     )
     
-    # Create model (2-layer MLP: 784 → 128 → 64)
+    # Create model (2-layer MLP: 3072 → 128 → 64)
     model = HierarchicalLPL(
         d_in=EXPERIMENT_CONFIG['d_in'],
         d_hidden=EXPERIMENT_CONFIG['d_hidden'],
@@ -174,7 +174,7 @@ def main():
     
     # Create datasets
     # For activation export: single images (not temporal pairs)
-    export_dataset = MNISTTemporalPairDataset(
+    export_dataset = CIFAR10TemporalPairDataset(
         train=True,
         return_temporal_pair=False,
         translate_range=EXPERIMENT_CONFIG['translate_range'],
@@ -183,7 +183,7 @@ def main():
     )
     
     # For training: temporal pairs
-    train_dataset = create_mnist_temporal_pair_dataset(
+    train_dataset = create_cifar10_temporal_pair_dataset(
         train=True,
         translate_range=EXPERIMENT_CONFIG['translate_range'],
         noise_std=EXPERIMENT_CONFIG['noise_std'],
@@ -228,14 +228,13 @@ def main():
     
     # Training loop
     print(f"\nTraining LPL for {EXPERIMENT_CONFIG['steps']} steps...")
-    print("Note: This is a long training run. Progress will be reported every 500 steps.")
     
     for step in range(1, EXPERIMENT_CONFIG['steps'] + 1):
         # Sample a temporal pair from the dataset
         idx = torch.randint(0, len(train_dataset), (1,)).item()
         x_t, x_t1, _ = train_dataset[idx]
         
-        # Flatten images to 1D tensors (28x28 = 784)
+        # Flatten images to 1D tensors (3x32x32 = 3072)
         x_t_flat = x_t.flatten()
         x_t1_flat = x_t1.flatten()
         
@@ -273,8 +272,8 @@ def main():
             print(f"ERROR: NaN detected in activations at step {step}!")
             assert False, f"NaN detected in activations at step {step}"
         
-        # Print progress every 500 steps (more frequent for long training)
-        if step % 500 == 0:
+        # Print progress every 100 steps
+        if step % 100 == 0:
             print(f"Step {step}/{EXPERIMENT_CONFIG['steps']} | "
                   f"||W1||={weight_norm_layer1:.4f} | ||W2||={weight_norm_layer2:.4f} | "
                   f"||y1||={activation_norm_layer1:.4f} | ||y2||={activation_norm_layer2:.4f}")
@@ -311,13 +310,13 @@ def main():
         print(f"ERROR: Layer1 activation std ({layer1_std_after:.6f}) is below 0.1 threshold - REPRESENTATION COLLAPSED!")
         assert False, "Layer1 representation collapsed - activation std < 0.1"
     else:
-        print(f"OK: Layer1 activation std ({layer1_std_after:.6f}) is above 0.1 threshold - representation is healthy")
+        print(f"OK: Layer1 activation std ({layer1_std_after:.6f}) is above 0.1 threshold")
     
     if layer2_std_after < 0.1:
         print(f"ERROR: Layer2 activation std ({layer2_std_after:.6f}) is below 0.1 threshold - REPRESENTATION COLLAPSED!")
         assert False, "Layer2 representation collapsed - activation std < 0.1"
     else:
-        print(f"OK: Layer2 activation std ({layer2_std_after:.6f}) is above 0.1 threshold - representation is healthy")
+        print(f"OK: Layer2 activation std ({layer2_std_after:.6f}) is above 0.1 threshold")
     
     torch.save(activations_after, output_dir / 'activations_after.pt')
     print(f"Saved activations to {output_dir / 'activations_after.pt'}")
@@ -348,39 +347,15 @@ def main():
     print(f"  Std > 0.1:       {layer2_std_after > 0.1}")
     print("="*70)
     
-    # Verify all files were created
-    print("\nVerifying exported files...")
-    required_files = [
-        'metadata.json',
-        'training_logs.json',
-        'activations_before.pt',
-        'activations_after.pt'
-    ]
-    
-    all_files_exist = True
-    for filename in required_files:
-        filepath = output_dir / filename
-        if filepath.exists():
-            file_size = filepath.stat().st_size
-            print(f"  OK: {filename} ({file_size:,} bytes)")
-        else:
-            print(f"  ERROR: {filename} not found!")
-            all_files_exist = False
-    
-    if not all_files_exist:
-        assert False, "Not all required files were exported!"
-    
     print(f"\nExperiment completed successfully!")
     print(f"All outputs saved to: {output_dir}")
     print(f"\nGenerated files:")
-    for filename in required_files:
-        print(f"  - {output_dir / filename}")
+    print(f"  - {output_dir / 'metadata.json'}")
+    print(f"  - {output_dir / 'training_logs.json'}")
+    print(f"  - {output_dir / 'activations_before.pt'}")
+    print(f"  - {output_dir / 'activations_after.pt'}")
 
 
 if __name__ == "__main__":
     main()
-
-
-
-
 

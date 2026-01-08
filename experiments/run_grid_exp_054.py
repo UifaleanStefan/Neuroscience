@@ -1,10 +1,10 @@
 """
-Grid Experiment #020: MNIST with 1-layer MLP (10k steps)
+Grid Experiment #054: CIFAR-10 with 1-layer MLP (5k steps)
 
 Configuration:
-- Dataset: MNIST (grayscale, 28x28 images, flattened to 784)
-- Training steps: 10,000
-- Architecture: 1-layer MLP (784 → 128 units)
+- Dataset: CIFAR-10 (RGB, 32x32 images, flattened to 3072)
+- Training steps: 5,000
+- Architecture: 1-layer MLP (3072 → 128 units)
 - Activation: tanh (scaled, same as previous runs)
 - Learning rule: full LPL (Hebbian + Predictive + Stabilization enabled)
 - Temporal pairs: Translation + noise transformations
@@ -22,7 +22,7 @@ project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
 from lpl_core.lpl_layer import LPLLayer
-from data.mnist import MNISTTemporalPairDataset, create_mnist_temporal_pair_dataset
+from data.cifar10 import CIFAR10TemporalPairDataset, create_cifar10_temporal_pair_dataset
 
 
 class LayerConfig:
@@ -43,7 +43,7 @@ def export_activations(model, dataset, num_samples=1000):
     
     Args:
         model: LPLLayer model
-        dataset: MNISTTemporalPairDataset (can be temporal pair or single image mode)
+        dataset: CIFAR10TemporalPairDataset (can be temporal pair or single image mode)
         num_samples: Number of samples to export
         
     Returns:
@@ -60,7 +60,7 @@ def export_activations(model, dataset, num_samples=1000):
         else:
             image, label = dataset[i]
         
-        # Flatten image to 1D tensor (28x28 = 784)
+        # Flatten image to 1D tensor (3x32x32 = 3072)
         x = image.flatten()
         
         # Ensure input is float32 and in [0,1] range
@@ -88,20 +88,20 @@ def export_activations(model, dataset, num_samples=1000):
 
 def main():
     """
-    Run grid experiment #020.
+    Run grid experiment #054.
     """
     # Fixed random seed for reproducibility
     torch.manual_seed(42)
     
     # Experiment configuration
     EXPERIMENT_CONFIG = {
-        'dataset': 'mnist',
-        'steps': 10000,
+        'dataset': 'cifar10',
+        'steps': 5000,
         'architecture': 'mlp_1layer_128',
         'activation': 'tanh',
         'rule': 'full_lpl',
         'baseline': 'none',
-        'd_in': 28 * 28,  # 28x28 images flattened to 784
+        'd_in': 3 * 32 * 32,  # 3x32x32 images flattened to 3072
         'd_out': 128,      # 128 units
         'lr_hebb': 0.001,
         'lr_pred': 0.001,
@@ -112,7 +112,7 @@ def main():
     }
     
     print("="*70)
-    print("GRID EXPERIMENT #020".center(70))
+    print("GRID EXPERIMENT #054".center(70))
     print("="*70)
     print(f"Dataset: {EXPERIMENT_CONFIG['dataset']}")
     print(f"Steps: {EXPERIMENT_CONFIG['steps']}")
@@ -120,13 +120,13 @@ def main():
     print(f"Activation: {EXPERIMENT_CONFIG['activation']}")
     print(f"Rule: {EXPERIMENT_CONFIG['rule']}")
     print(f"Baseline: {EXPERIMENT_CONFIG['baseline']}")
-    print(f"Input dimension: {EXPERIMENT_CONFIG['d_in']} (28x28 flattened)")
+    print(f"Input dimension: {EXPERIMENT_CONFIG['d_in']} (3x32x32 flattened)")
     print(f"Output dimension: {EXPERIMENT_CONFIG['d_out']}")
     print("="*70)
     
     # Create output directory with experiment identifier
     output_base = Path('outputs/grid_experiments')
-    output_dir = output_base / f"run_020_{EXPERIMENT_CONFIG['dataset']}_{EXPERIMENT_CONFIG['steps']}steps_{EXPERIMENT_CONFIG['architecture']}_{EXPERIMENT_CONFIG['activation']}_{EXPERIMENT_CONFIG['rule']}"
+    output_dir = output_base / f"run_054_{EXPERIMENT_CONFIG['dataset']}_{EXPERIMENT_CONFIG['steps']}steps_{EXPERIMENT_CONFIG['architecture']}_{EXPERIMENT_CONFIG['activation']}_{EXPERIMENT_CONFIG['rule']}"
     output_dir.mkdir(parents=True, exist_ok=True)
     
     # Save metadata
@@ -154,7 +154,7 @@ def main():
     
     # Create datasets
     # For activation export: single images (not temporal pairs)
-    export_dataset = MNISTTemporalPairDataset(
+    export_dataset = CIFAR10TemporalPairDataset(
         train=True,
         return_temporal_pair=False,
         translate_range=EXPERIMENT_CONFIG['translate_range'],
@@ -163,7 +163,7 @@ def main():
     )
     
     # For training: temporal pairs
-    train_dataset = create_mnist_temporal_pair_dataset(
+    train_dataset = create_cifar10_temporal_pair_dataset(
         train=True,
         translate_range=EXPERIMENT_CONFIG['translate_range'],
         noise_std=EXPERIMENT_CONFIG['noise_std'],
@@ -206,7 +206,7 @@ def main():
         idx = torch.randint(0, len(train_dataset), (1,)).item()
         x_t, x_t1, _ = train_dataset[idx]
         
-        # Flatten images to 1D tensors (28x28 = 784)
+        # Flatten images to 1D tensors (3x32x32 = 3072)
         x_t_flat = x_t.flatten()
         x_t1_flat = x_t1.flatten()
         
@@ -301,8 +301,6 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
 
 
 
