@@ -44,6 +44,8 @@ def normalize_activation_format(data: Dict) -> Dict:
         normalized['layer1'] = data['layer1']
     elif 'layer1_activations' in data:
         normalized['layer1'] = data['layer1_activations']
+    elif 'mlp_layer1_activations' in data:
+        normalized['layer1'] = data['mlp_layer1_activations']
     else:
         raise ValueError("Missing layer1 activations in activation data")
     
@@ -52,6 +54,8 @@ def normalize_activation_format(data: Dict) -> Dict:
         normalized['layer2'] = data['layer2']
     elif 'layer2_activations' in data:
         normalized['layer2'] = data['layer2_activations']
+    elif 'mlp_layer2_activations' in data:
+        normalized['layer2'] = data['mlp_layer2_activations']
     # If not present, that's fine (single layer model)
     
     return normalized

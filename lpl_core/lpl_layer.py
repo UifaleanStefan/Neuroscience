@@ -42,7 +42,7 @@ class LPLLayer:
         """
         Compute representation: y_t = W @ x_t.
         
-        Applies tanh squashing to keep activations bounded and prevent explosion.
+        Applies ReLU activation to keep activations non-negative.
         
         Args:
             x: Input tensor of shape (d_in,)
@@ -53,9 +53,8 @@ class LPLLayer:
         assert x.dim() == 1, "x must be 1D"
         assert x.shape[0] == self.d_in, f"x dimension must match input dimension {self.d_in}"
         y = self.W @ x
-        # Apply tanh squashing to keep activations bounded (range: -1 to 1)
-        # Scale by 5 to allow larger range while still bounding
-        y = torch.tanh(y / 5.0) * 5.0
+        # Apply ReLU activation (non-negative)
+        y = torch.relu(y)
         return y
     
     def update(self, x_t: torch.Tensor, x_t1: torch.Tensor) -> None:

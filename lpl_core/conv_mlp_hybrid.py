@@ -96,7 +96,7 @@ class ConvMLPHybrid:
         # Flatten conv output
         conv_flat = conv_out.flatten()  # (C_out * H * W,)
         
-        # Linear LPL layer forward (includes tanh activation)
+        # Linear LPL layer forward (includes ReLU activation)
         output = self.linear.forward(conv_flat)
         
         return output

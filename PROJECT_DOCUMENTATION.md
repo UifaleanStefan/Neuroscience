@@ -80,9 +80,7 @@ Each dataset follows the same 17-experiment structure:
 4. **Conv-MLP Hybrid**: 4 experiments
    - Conv layer: 16 channels, kernel=5, stride=1, padding=2
    - MLP head: 128→64 units
-   - Step counts vary:
-     - MNIST: 1000, 5000, 10000, 50000
-     - Others: 1000, 5000, 10000, 20000
+   - Step counts: 1000, 5000, 10000, 20000 (all datasets)
 
 5. **Backpropagation Baseline**: 1 experiment
    - MLP 1-layer (128 units)
