@@ -1,0 +1,149 @@
+{
+  "ablation_hebb": {
+    "activation_stats": {
+      "mean": 0.008772785775363445,
+      "std": 0.07853258401155472,
+      "min": 0.0,
+      "max": 1.4364968538284302,
+      "median": 0.0
+    },
+    "linear_probe_accuracy": {
+      "mean": 0.18333333333333335,
+      "std": 0.012472191289246473,
+      "all": [
+        0.2,
+        0.18,
+        0.17
+      ]
+    },
+    "separation_metrics": {
+      "intra_variance": 0.0005471709882840514,
+      "inter_distance": 0.13207536935806274,
+      "separation_ratio": 0.004142869263887405
+    }
+  },
+  "ablation_pred": {
+    "activation_stats": {
+      "mean": 575.9368896484375,
+      "std": 2020.5291748046875,
+      "min": 0.0,
+      "max": 13698.23046875,
+      "median": 0.0
+    },
+    "linear_probe_accuracy": {
+      "mean": 0.19166666666666665,
+      "std": 0.0164991582276861,
+      "all": [
+        0.21,
+        0.17,
+        0.195
+      ]
+    },
+    "separation_metrics": {
+      "intra_variance": 240477.078125,
+      "inter_distance": 2780.795654296875,
+      "separation_ratio": 86.47779846191406
+    }
+  },
+  "ablation_stab": {
+    "activation_stats": {
+      "mean": 3760.55078125,
+      "std": 3479.779052734375,
+      "min": 0.0,
+      "max": 13698.23046875,
+      "median": 3619.0830078125
+    },
+    "linear_probe_accuracy": {
+      "mean": 0.20166666666666666,
+      "std": 0.00849836585598797,
+      "all": [
+        0.19,
+        0.21,
+        0.205
+      ]
+    },
+    "separation_metrics": {
+      "intra_variance": 1423831.25,
+      "inter_distance": 6765.67236328125,
+      "separation_ratio": 210.4493408203125
+    }
+  },
+  "ablation_shuffle": {
+    "activation_stats": {
+      "mean": 409.17083740234375,
+      "std": 1713.1549072265625,
+      "min": 0.0,
+      "max": 13697.666015625,
+      "median": 0.0
+    },
+    "linear_probe_accuracy": {
+      "mean": 0.155,
+      "std": 0.01414213562373095,
+      "all": [
+        0.175,
+        0.145,
+        0.145
+      ]
+    },
+    "separation_metrics": {
+      "intra_variance": 168954.015625,
+      "inter_distance": 2330.37353515625,
+      "separation_ratio": 72.5008316040039
+    }
+  },
+  "swap": {
+    "before_training": {
+      "activation_stats": {
+        "mean": 0.10669070482254028,
+        "std": 0.17173554003238678,
+        "min": 0.0,
+        "max": 1.26645827293396,
+        "median": 0.0
+      },
+      "linear_probe_accuracy": {
+        "mean": 0.3283333333333333,
+        "std": 0.023213980461973528,
+        "all": [
+          0.32,
+          0.36,
+          0.305
+        ]
+      },
+      "separation_metrics": {
+        "intra_variance": 0.0072791688144207,
+        "inter_distance": 0.4181475043296814,
+        "separation_ratio": 0.017408136278390884
+      }
+    },
+    "after_swap_exposure": {
+      "activation_stats": {
+        "mean": 283.718017578125,
+        "std": 1456.499267578125,
+        "min": 0.0,
+        "max": 13697.052734375,
+        "median": 0.0
+      },
+      "linear_probe_accuracy": {
+        "mean": 0.18000000000000002,
+        "std": 0.008164965809277256,
+        "all": [
+          0.18,
+          0.17,
+          0.19
+        ]
+      },
+      "separation_metrics": {
+        "intra_variance": 119965.5859375,
+        "inter_distance": 1964.144775390625,
+        "separation_ratio": 61.0777702331543
+      }
+    },
+    "identity_preservation": {
+      "mean_self_similarity": 0.3856329615503115,
+      "same_class_mean_sim": 0.9999999795293749,
+      "diff_class_mean_sim": 0.9999999800994336,
+      "identity_preservation_correlation": -0.007065353867699779,
+      "correlation_p_value": 0.31893896908385255
+    }
+  }
+}

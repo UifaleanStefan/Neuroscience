@@ -1,0 +1,25 @@
+LPL REPRESENTATION QUALITY SUMMARY
+
+─────────────────────────────────────────────────────────────────────
+
+1. SYNTHETIC SHAPES: Near-Perfect Separation
+   Ratio: 0.88-0.98 (< 1.0 = excellent)
+   
+2. NATURAL IMAGES: Partial but Meaningful Clustering  
+   Ratio: 1.17-2.36 (> 1.0 = overlap), but 18-69% accuracy (> 10% chance)
+   
+3. NON-COLLAPSED: 99%+ experiments healthy (std >> 0.1)
+   
+4. DATASET-DEPENDENT: Conv-MLP best for complex datasets, MLP for simple
+
+─────────────────────────────────────────────────────────────────────
+
+QUANTITATIVE RESULTS:
+
+              Best Ratio    Best Accuracy    Best Architecture
+───────────────────────────────────────────────────────────────────
+Shapes         0.88-0.98      99.8%            Conv-MLP
+MNIST          1.69           69.0%            MLP
+Fashion-MNIST  1.32           50.0%            Conv-MLP
+CIFAR-10       1.37           27.7%            Conv-MLP
+STL-10         1.17           31.3%            Conv-MLP
